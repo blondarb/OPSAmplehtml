@@ -1086,6 +1086,7 @@ Called on:
 - **Tools:** Consolidated from 4 (save_interview_output, save_scale_responses, request_scale_administration, plus the prior bulk-style) to **3** (save_interview_output, query_evidence, scale_step). `query_evidence` is a new model-callable Evidence Engine query (Retrieve-only via Bedrock KB, 5s timeout, filler-line UX). `scale_step` is paginated — one item per call, instrument validity preserved via STRICT VERBATIM RULE in the tool description.
 - **Prompt:** Phased structure (turns 1-3 open exploration, turns 4+ tool-augmented), 15-25 turn soft budget, neurology focus list (headache / seizure / movement / MS / neuropathy / cognitive / stroke / NMD).
 - **Localizer push channel:** After each Localizer run (every 3 turns), client re-serializes `BASE_PROMPT + [LATEST PUSH]` and emits `session.update` to refresh the model's working instructions. Preserves base prompt + safety block AND avoids timeline pollution.
+- **Localizer latency:** The live hook always uses `mode:'steer'` (Steps 1/2/3a plus attending, unchanged 15 s budget); clinician mirrors and EmbeddedHistorian request off-cycle `mode:'detail'` (Step 3b only, separate 25 s budget). Patient routes never request detail, and detail never feeds Henry. Absent/`full` mode preserves the legacy combined path. Full/detail cap differential at 3, exclusions at 2, questions at 3; model, temperature, 900-token detail budget and clinical wording instructions stay unchanged. Content-free `localizer_timing` includes mode.
 - **Migration 047:** paginated `scale_results` (`status`, `current_index`) + `patient_id`/`responses`/`raw_score` NOT NULL relaxations for schema-drift compatibility with the legacy submit path.
 - **Scope guards:** Demo-only (no PHI through OpenAI). First-encounter history-taking only. Multi-modal / prior-visits remain out of scope as future agents.
 
@@ -1167,9 +1168,27 @@ oldest end to at most 60,000 text characters. Counters reset at session start.
 
 Both providers privately receive only the first sanitized attending gap as the
 next-question suggestion. Absent/empty gaps leave the delta byte-identical.
-Speaking and safety guards remain in place. Nova is limited to 12 localizer
-injection attempts per session; OpenAI instruction rewrites remain uncapped.
-Safety escalation and pre-close messages use their existing separate paths and
-are not charged against this localizer ceiling. No server flags are changed.
+Speaking and safety guards remain in place; OpenAI instruction rewrites remain
+uncapped. **On Nova the steer is a PULL, not a push (2026-09-06).** The relay's
+only text channel is an interactive USER turn (a second SYSTEM block fails the
+stream), and Nova answers it: while the steer went through that channel each
+push made Nova start a new response while the patient was still answering — in
+the first prod session with the steer live, 5 of 7 pushes produced an extra
+Henry utterance 5–7 s after a completed answer, then barge-in cut it off.
+Non-interactive text blocks (`contentStart.interactive = false`, USER or
+ASSISTANT role) are accepted silently but ignored — no output and no effect on
+the next question in 5 of 5 probes. Tool results are the supported mid-turn
+channel, so the hook now parks the hint (first attending gap, else the
+suggested question) and serves it once when Henry calls `get_attending_hint`
+after the patient's next answer. The session route offers that tool and the
+workflow text only when the client sends `steer` (i.e. it will run the
+localizer); the workflow is anchored at the top of the prompt and as item 7 of
+the per-turn checklist — appended as a trailing paragraph it was not followed
+(0 calls in 4 turns). Real-prompt probes: tool called ~1.0–1.3 s after each
+patient answer in 7/8 turns, hinted question asked 2/2, no mention of hint,
+attending or tool; Henry's first words arrive ~0.8 s later than without the
+tool. Safety escalation and pre-close messages keep their interactive paths.
+No server flags are changed; `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=false`
+still removes the whole path (no tool offered) on patient routes.
 
 Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time, default off; PR #212); the clinician panel stays gated on `clinicianMirror`. Until that flag is on, attending gaps reach Henry only on `/consult/triage-historian` and the embedded consult flow.

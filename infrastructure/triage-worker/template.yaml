@@ -207,7 +207,7 @@ Resources:
               Action: sqs:SendMessage
               Resource: !GetAtt HistorianEvalWorkQueue.Arn
       Events:
-        RecoverySweep:
+        PendingSweep:
           Type: ScheduleV2
           Properties:
             ScheduleExpression: rate(1 minute)

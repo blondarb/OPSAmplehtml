@@ -37,7 +37,7 @@ describe('preclose gate wiring', () => {
     expect(localizer).not.toContain('injectSystemText(')
     expect(localizer.match(/pushLocalizerContext\(pushPayload\)/g)).toHaveLength(1)
     expect(localizer).toContain('shouldPushLocalizer({')
-    expect(localizer).toContain('speaking: isAiSpeakingRef.current')
+    expect(localizer).toContain('speaking: providerRef.current?.updateInstructions ? isAiSpeakingRef.current : false')
     expect(localizer).toContain('safetyEscalated: safetyEscalatedRef.current')
     expect(localizer).toContain('payloadEmpty: !pushPayload')
     const embedded = readFileSync('src/components/consult/EmbeddedHistorian.tsx', 'utf8')

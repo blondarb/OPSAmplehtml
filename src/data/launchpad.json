@@ -1,0 +1,765 @@
+{
+  "_meta": {
+    "purpose": "Source of truth for the launchpad page: one entry per project, every place Steve or the team needs to reach. Maintained at /end alongside the Asana mirror step. No PHI, no secrets.",
+    "updated": "2026-09-06",
+    "login_pools": {
+      "evidence": "Cognito SevaroEvidenceEngine pool (see CLAUDE.md → Auth) — shared by app/evidence/staging-evidence/neuroevidence/neuroscribe/sense/coding/evaluations",
+      "users-deprecated": "Cognito sevaro-users pool (deprecated) — hub only; being consolidated into evidence",
+      "microsoft": "Entra SSO — scribe-feedback board",
+      "token": "shared token form — voice-agent /reports"
+    },
+    "asana_portfolio": "https://app.asana.com/1/1202528578803653/project/1216732610903907",
+    "asana_team_ops": "https://app.asana.com/1/1202528578803653/project/1216732928451545",
+    "asana_pipeline": "https://app.asana.com/1/1202528578803653/project/1216732326167102",
+    "sharepoint": "https://sevarohealth.sharepoint.com/sites/SynapseLabs",
+    "canonical": "This file is the source of truth (rendered at /launchpad). sevaro-context/projects/launchpad.json is a pointer. Refresh at /end when a URL, phone number, or project changes."
+  },
+  "projects": [
+    {
+      "id": "scribe",
+      "name": "Desktop Scribe / Companion",
+      "stage": "Graduate",
+      "priority": "High",
+      "asana_card": "AI Scribe / CDS (flagship)",
+      "repos": [
+        "https://github.com/SevaroHealth/sevaro-scribe-companion"
+      ],
+      "links": [
+        {
+          "label": "Prod installer (pilot clinicians)",
+          "url": "https://d2ox49sbh22v62.cloudfront.net/desktop-scribe/Sevaro-Desktop-Scribe-Setup.exe",
+          "kind": "download",
+          "auth": "none",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Beta installer (Steve/Riya/Adam)",
+          "url": "https://d2ox49sbh22v62.cloudfront.net/desktop-scribe/beta/Sevaro-Desktop-Scribe-Beta-Setup.exe",
+          "kind": "download",
+          "auth": "none",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Install guide",
+          "url": "https://d2ox49sbh22v62.cloudfront.net/desktop-scribe/guide/guide.html",
+          "kind": "docs",
+          "auth": "none",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Feedback Board (pilot SSOT)",
+          "url": "https://scribe-feedback.neuroplans.app/board",
+          "kind": "results",
+          "auth": "microsoft",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Feedback review / ungrounded / velocity",
+          "url": "https://scribe-feedback.neuroplans.app/review",
+          "kind": "results",
+          "auth": "microsoft",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "NeuroScribe web (legacy landing)",
+          "url": "https://neuroscribe.neuroplans.app/scribe",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Scribe guide (in SEE)",
+          "url": "https://evidence.neuroplans.app/scribe-guide",
+          "kind": "docs",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Install guide (dl alias)",
+          "url": "https://dl.neuroplans.app/desktop-scribe/guide/guide.html",
+          "kind": "docs",
+          "auth": "none",
+          "note": "dl.neuroplans.app = CloudFront alias, no directory listing (403 on folders)",
+          "status": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732631441350"
+    },
+    {
+      "id": "see",
+      "name": "Evidence Engine (SEE)",
+      "stage": "Validate",
+      "priority": "High",
+      "asana_card": "Evidence Engine",
+      "repos": [
+        "https://github.com/blondarb/sevaro-evidence-engine"
+      ],
+      "links": [
+        {
+          "label": "Prod chat (live clinical use)",
+          "url": "https://evidence.neuroplans.app/chat",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Reasoning",
+          "url": "https://evidence.neuroplans.app/reasoning",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Staging (develop branch)",
+          "url": "https://staging-evidence.neuroplans.app/chat",
+          "kind": "test",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Spot-check results",
+          "url": "https://evidence.neuroplans.app/spotcheck/results",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Eval admin",
+          "url": "https://evidence.neuroplans.app/admin/eval",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "KB gaps",
+          "url": "https://evidence.neuroplans.app/admin/kb-gaps",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Calculators / Exams / On-call guide",
+          "url": "https://evidence.neuroplans.app/calculators",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Feature requests",
+          "url": "https://evidence.neuroplans.app/feature-requests",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "NeuroEvidence search (separate Amplify app)",
+          "url": "https://neuroevidence.neuroplans.app/search",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732768053768"
+    },
+    {
+      "id": "historian",
+      "name": "AI Historian",
+      "stage": "Explore",
+      "priority": "High",
+      "asana_card": "AI Historian",
+      "asana_gid": "1216732610395590",
+      "repos": [
+        "https://github.com/blondarb/OPSAmplehtml"
+      ],
+      "links": [
+        {
+          "label": "Patient historian (patient-facing)",
+          "url": "https://app.neuroplans.app/patient/historian",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Runs / results",
+          "url": "https://app.neuroplans.app/rnd/historian",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Simulator (test)",
+          "url": "https://app.neuroplans.app/rnd/historian/simulator",
+          "kind": "test",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Triage-historian (consult view)",
+          "url": "https://app.neuroplans.app/consult/triage-historian",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Triage-historian (patient view)",
+          "url": "https://app.neuroplans.app/patient/triage-historian",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "triage",
+      "name": "Triage tool",
+      "stage": "Explore",
+      "priority": "High",
+      "asana_card": "Triage tool",
+      "asana_gid": "1216732667195494",
+      "repos": [
+        "https://github.com/blondarb/OPSAmplehtml"
+      ],
+      "links": [
+        {
+          "label": "Triage",
+          "url": "https://app.neuroplans.app/triage",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Validation (test cases)",
+          "url": "https://app.neuroplans.app/triage/validate",
+          "kind": "test",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Validation results",
+          "url": "https://app.neuroplans.app/triage/validate/results",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Validation admin",
+          "url": "https://app.neuroplans.app/triage/validate/admin",
+          "kind": "admin",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "kiran",
+      "name": "Kiran voice operator (was Clara)",
+      "stage": "Explore",
+      "priority": "High",
+      "asana_card": "Kiran voice operator (renamed from Clara)",
+      "asana_gid": "1216732768043599",
+      "repos": [
+        "https://github.com/SevaroHealth/sevaro-voice-agent"
+      ],
+      "links": [
+        {
+          "label": "Dev phone line (Twilio) — test calls, NO PHI",
+          "url": "tel:+17402792803",
+          "display": "+1 (740) 279-2803",
+          "kind": "phone",
+          "auth": "none",
+          "note": "transfer from the test facility currently rings Lauren (BD) via OneCall dev roster",
+          "status": null
+        },
+        {
+          "label": "Routing reports",
+          "url": "https://sevaro-voice-agent-dev.cloud.mysevaro.com/reports",
+          "kind": "results",
+          "auth": "token",
+          "note": "Fargate in the Okta-SSO account, not sandbox",
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Browser harness (Nova Sonic)",
+          "url": "https://app.neuroplans.app/rnd/clara",
+          "kind": "test",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Harness results",
+          "url": "https://app.neuroplans.app/rnd/clara/results",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Neuro FAQ voice POC (Amplify preview)",
+          "url": "https://feat-neuro-faq-voice-poc.d3ietjwgco4g2t.amplifyapp.com",
+          "kind": "test",
+          "auth": "evidence",
+          "status": "unverified",
+          "note": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "sdne",
+      "name": "SENSE / SDNE + Samsung",
+      "stage": "Explore",
+      "priority": "High",
+      "asana_card": "SENSE / SDNE + Samsung",
+      "repos": [
+        "https://github.com/blondarb/SDNE",
+        "https://github.com/blondarb/sdne-dashboard",
+        "https://github.com/blondarb/sense-companion-android"
+      ],
+      "links": [
+        {
+          "label": "SENSE dashboard",
+          "url": "https://sense.neuroplans.app",
+          "kind": "results",
+          "auth": "evidence",
+          "note": "security gate open (red)",
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "SDNE page in OPSAmple",
+          "url": "https://app.neuroplans.app/sdne",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Voice biomarkers",
+          "url": "https://app.neuroplans.app/voice-biomarkers",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732600397387"
+    },
+    {
+      "id": "coding",
+      "name": "Coding & billing tool (EM)",
+      "stage": "Validate",
+      "priority": "Medium",
+      "asana_card": "Coding & billing tool",
+      "repos": [
+        "https://github.com/blondarb/sevaro-em-coding-engine",
+        "https://github.com/blondarb/sevaro-em-coding-ui"
+      ],
+      "links": [
+        {
+          "label": "Coding UI",
+          "url": "https://coding.neuroplans.app",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Batch compare",
+          "url": "https://coding.neuroplans.app/compare",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732600495053"
+    },
+    {
+      "id": "fppe",
+      "name": "FPPE / OPPE engine",
+      "stage": "Validate",
+      "priority": "Low",
+      "asana_card": "FPPE / OPPE engine",
+      "asana_gid": "1216732610889607",
+      "repos": [
+        "https://github.com/blondarb/sevaro-fppe-oppe-engine"
+      ],
+      "links": [
+        {
+          "label": "Evaluations app",
+          "url": "https://evaluations.neuroplans.app/login",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Results",
+          "url": "https://evaluations.neuroplans.app/results",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Reports / Leadership / Audit",
+          "url": "https://evaluations.neuroplans.app/reports",
+          "kind": "results",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Submit a case",
+          "url": "https://evaluations.neuroplans.app/submit",
+          "kind": "app",
+          "auth": "evidence",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "feedback",
+      "name": "Feedback pipeline + Hub",
+      "stage": "Live",
+      "priority": "Medium",
+      "asana_card": null,
+      "repos": [
+        "https://github.com/blondarb/sevaro-hub",
+        "https://github.com/blondarb/sevaro-feedback",
+        "https://github.com/blondarb/scribe-feedback-board"
+      ],
+      "links": [
+        {
+          "label": "Hub feedback sessions",
+          "url": "https://hub.neuroplans.app/feedback",
+          "kind": "results",
+          "auth": "users-deprecated",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Nightly triage approvals",
+          "url": "https://hub.neuroplans.app/feedback/triage",
+          "kind": "admin",
+          "auth": "users-deprecated",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Improvement queue (Copy Prompt)",
+          "url": "https://hub.neuroplans.app/admin/improvements",
+          "kind": "admin",
+          "auth": "users-deprecated",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Prompt registry / What's New",
+          "url": "https://hub.neuroplans.app/admin/prompts",
+          "kind": "admin",
+          "auth": "users-deprecated",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "teleencounter",
+      "name": "Synapse Teleencounter (unified surface)",
+      "stage": "Frame",
+      "priority": "Low",
+      "asana_card": "Unified app / \"Synapse 3.0\"",
+      "repos": [
+        "https://github.com/blondarb/synapse-teleencounter"
+      ],
+      "links": [
+        {
+          "label": "Test queue",
+          "url": "https://test.neuroplans.app/queue",
+          "kind": "test",
+          "auth": "evidence",
+          "status": "unverified",
+          "note": null,
+          "display": null
+        },
+        {
+          "label": "Synapse 3 unified-surface concept",
+          "url": "https://main.d3ietjwgco4g2t.amplifyapp.com/concepts/synapse-3/unified-surface.html",
+          "kind": "docs",
+          "auth": "none",
+          "status": "unverified",
+          "note": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732599407868"
+    },
+    {
+      "id": "licensing",
+      "name": "Licensing / credentialing (LicenseCred)",
+      "stage": "Explore",
+      "priority": "Medium",
+      "asana_card": "Licensing / credentialing automation",
+      "repos": [
+        "https://github.com/SevaroHealth/LicenseCred"
+      ],
+      "links": [
+        {
+          "label": "LicenseCred",
+          "url": "https://license.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "status": "root returns 404 — entry route unknown",
+          "note": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216732928094049"
+    },
+    {
+      "id": "rhtp",
+      "name": "RHTP Contracts (Dhruv)",
+      "stage": "Live",
+      "priority": "Medium",
+      "asana_card": "RHTP Contracts",
+      "repos": [],
+      "links": [
+        {
+          "label": "RHTP app",
+          "url": "https://rhtp.neuroplans.app/login",
+          "kind": "app",
+          "auth": "unknown",
+          "note": "not hosted in sevaro-sandbox Amplify — host unknown",
+          "status": null,
+          "display": null
+        }
+      ],
+      "asana_gid": "1216835397918408"
+    },
+    {
+      "id": "ops-board",
+      "name": "Sevaro Ops Board (exec, Dhruv admin)",
+      "stage": "Live",
+      "priority": "Medium",
+      "asana_card": "Sevaro Ops Board — exec portfolio board",
+      "asana_gid": "1217809418672520",
+      "repos": [],
+      "links": [
+        {
+          "label": "Ops Board",
+          "url": null,
+          "kind": "app",
+          "auth": "unknown",
+          "status": "URL not found in any repo or doc — ask Dhruv",
+          "note": null,
+          "display": null
+        }
+      ]
+    },
+    {
+      "id": "plans-family",
+      "name": "Specialty Plans family (dormant)",
+      "stage": "Live",
+      "priority": "Low",
+      "asana_card": null,
+      "repos": [
+        "https://github.com/blondarb/neuro-plans-v2",
+        "https://github.com/blondarb/cardio-plans-v2",
+        "https://github.com/blondarb/pulm-crit-care-v2",
+        "https://github.com/blondarb/pmr-rehab-v2",
+        "https://github.com/blondarb/spine-surgery-v2",
+        "https://github.com/blondarb/neurocrit-care-v2",
+        "https://github.com/blondarb/sevaro-eeg-reporter",
+        "https://github.com/blondarb/patient-health-platform",
+        "https://github.com/blondarb/personal-tools"
+      ],
+      "links": [
+        {
+          "label": "NeuroPlans",
+          "url": "https://neuro.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Plans",
+          "url": "https://plans.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "CardioPlans",
+          "url": "https://cardio.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Pulm/Crit",
+          "url": "https://pulm.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "PM&R",
+          "url": "https://pmr.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Spine",
+          "url": "https://spine.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "NeuroCrit",
+          "url": "https://neurocrit.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "EEG Reporter",
+          "url": "https://eeg.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Patient health platform",
+          "url": "https://patient.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        },
+        {
+          "label": "Personal tools",
+          "url": "https://tools.neuroplans.app",
+          "kind": "app",
+          "auth": "unknown",
+          "note": null,
+          "status": null,
+          "display": null
+        }
+      ]
+    }
+  ],
+  "dead_or_retired": [
+    {
+      "url": "https://showcase.neuroplans.app",
+      "note": "no DNS — Amplify app d3cv0hjf6snte2 no longer exists"
+    },
+    {
+      "url": "https://sdne.neuroplans.app",
+      "note": "no DNS — replaced by sense.neuroplans.app"
+    },
+    {
+      "url": "https://workouts.neuroplans.app",
+      "note": "no DNS"
+    },
+    {
+      "url": "https://staging.neuroplans.app",
+      "note": "no DNS"
+    },
+    {
+      "url": "https://dev-evidence.neuroplans.app",
+      "note": "no DNS — SEE alpha/dev branches gone"
+    },
+    {
+      "url": "https://alpha-evidence.neuroplans.app",
+      "note": "no DNS"
+    }
+  ]
+}

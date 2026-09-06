@@ -172,10 +172,28 @@ oldest end to at most 60,000 text characters. Counters reset at session start.
 
 Both providers privately receive only the first sanitized attending gap as the
 next-question suggestion. Absent/empty gaps leave the delta byte-identical.
-Speaking and safety guards remain in place. Nova is limited to 12 localizer
-injection attempts per session; OpenAI instruction rewrites remain uncapped.
-Safety escalation and pre-close messages use their existing separate paths and
-are not charged against this localizer ceiling. No server flags are changed.
+Speaking and safety guards remain in place; OpenAI instruction rewrites remain
+uncapped. **On Nova the steer is a PULL, not a push (2026-09-06).** The relay's
+only text channel is an interactive USER turn (a second SYSTEM block fails the
+stream), and Nova answers it: while the steer went through that channel each
+push made Nova start a new response while the patient was still answering — in
+the first prod session with the steer live, 5 of 7 pushes produced an extra
+Henry utterance 5–7 s after a completed answer, then barge-in cut it off.
+Non-interactive text blocks (`contentStart.interactive = false`, USER or
+ASSISTANT role) are accepted silently but ignored — no output and no effect on
+the next question in 5 of 5 probes. Tool results are the supported mid-turn
+channel, so the hook now parks the hint (first attending gap, else the
+suggested question) and serves it once when Henry calls `get_attending_hint`
+after the patient's next answer. The session route offers that tool and the
+workflow text only when the client sends `steer` (i.e. it will run the
+localizer); the workflow is anchored at the top of the prompt and as item 7 of
+the per-turn checklist — appended as a trailing paragraph it was not followed
+(0 calls in 4 turns). Real-prompt probes: tool called ~1.0–1.3 s after each
+patient answer in 7/8 turns, hinted question asked 2/2, no mention of hint,
+attending or tool; Henry's first words arrive ~0.8 s later than without the
+tool. Safety escalation and pre-close messages keep their interactive paths.
+No server flags are changed; `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=false`
+still removes the whole path (no tool offered) on patient routes.
 
 Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time, default off; PR #212); the clinician panel stays gated on `clinicianMirror`. Until that flag is on, attending gaps reach Henry only on `/consult/triage-historian` and the embedded consult flow.
 
@@ -183,3 +201,11 @@ Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUB
 - `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time; Amplify rebuild required) makes `NeurologicHistorian` run the localizer on `/patient/*` routes. Only Henry's private steer consumes the result (localizer hints and, with `HISTORIAN_ATTENDING_ENABLED`, attending-review gaps); the differential panel remains gated on the `clinicianMirror` prop, which no patient route sets.
 - Default off. Until it is on, `/patient/historian` runs the prompt alone — no localizer, no attending review — and only `/consult/triage-historian` exercises them.
 
+
+### Localizer latency budget (2026-09-06)
+
+After PR #215, production measurements on 2026-09-06 showed Step 1 (~5.5 s) → Step 2 (~2 s) → concurrent steer (~4 s), clinician detail (~13 s), and attending (8 s own budget). The shared 15 s deadline delayed every steer response until detail aborted, leaving `partial:true` and `Differential detail timed out` with no clinician rationale/exclusions.
+
+The live hook now always requests `mode:'steer'`: Steps 1, 2, 3a and attending keep the unchanged 15 s budget, with no Step 3b and no partial status merely for omitted detail. The response carries transport-only `detail_input`. Clinician-mirror routes (`NeurologicHistorian` with `clinicianMirror`) and `EmbeddedHistorian` opt into a separate `mode:'detail'` request: only Step 3b, with its own 25 s budget below Amplify WEB_COMPUTE's 30 s cap. Patient routes never request detail. Detail never feeds Henry; it replaces clinician fields after the steer push, with cancellation on end/unmount and stale-cycle/session guards. Missing or invalid detail inputs return 400. `mode:'full'` or absent mode retains the legacy combined pipeline, fallback and 15 s deadline.
+
+Full and detail outputs cap differential diagnoses at 3, exclusions at 2, and follow-up questions at 3 in prompt and code. Model, temperature, 900-token detail budget and clinical wording instructions are unchanged. Detail uses the existing non-fatal consult persistence path; its transport input contains guideline text but no citation metadata, so stored steer sources are preserved. Each processed request emits content-free `localizer_timing` telemetry including `mode`; detail logs only session id, Step 3b/total durations, partial status and abort status. No transcript, symptom, question, diagnosis or `detail_input` is logged. Mocked tests cover modes, caps, 16 s success / 25 s abort, old-client compatibility and client isolation; live latency acceptance remains deferred.

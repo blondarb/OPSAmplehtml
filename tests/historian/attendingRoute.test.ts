@@ -35,7 +35,8 @@ it('flag off preserves Step 3 and omits attending fields for an old client', asy
   expect(body.push_payload).toEqual({ top_differentials: [], suggested_next_question: step3.followUpQuestions[0], suggested_scale_id: null })
   expect(body).not.toHaveProperty('attending_gaps')
   expect(body).not.toHaveProperty('attending_meta')
-  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+  // Step 1 + Step 3a steer + Step 3b detail (PR #215); attending must not add a 4th call.
+  expect(mocks.invoke).toHaveBeenCalledTimes(3)
 })
 
 it('runs on interval with full transcript and returns at most three sanitized questions', async () => {
@@ -57,7 +58,8 @@ it.each([...[true, 'true', 1, '1'].map(safetyEscalated => ({ safetyEscalated, lo
   const body = await (await POST(request(extra))).json()
   expect(body.attending_meta.ran).toBe(false)
   expect(body.push_payload).not.toHaveProperty('attending_gaps')
-  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+  // Step 1 + Step 3a steer + Step 3b detail (PR #215); attending must not add a 4th call.
+  expect(mocks.invoke).toHaveBeenCalledTimes(3)
 })
 
 it('Step 4 rejection preserves a 200 Step 3 payload and logs no error text', async () => {
@@ -111,7 +113,8 @@ it('skips enabled review for old clients with a fixed eight-turn window', async 
   vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', 'true')
   const body = await (await POST(request())).json()
   expect(body.attending_meta).toEqual({ ran: false, reason: 'no_cycle' })
-  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+  // Step 1 + Step 3a steer + Step 3b detail (PR #215); attending must not add a 4th call.
+  expect(mocks.invoke).toHaveBeenCalledTimes(3)
 })
 
 it('isolates a signal-composition setup throw before Bedrock', async () => {
@@ -123,7 +126,8 @@ it('isolates a signal-composition setup throw before Bedrock', async () => {
   expect(response.status).toBe(200)
   expect(body).toMatchObject({ ...step3, partial: false, attending_gaps: [], attending_meta: { reason: 'error' } })
   expect(body.push_payload.suggested_next_question).toBe(step3.followUpQuestions[0])
-  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+  // Step 1 + Step 3a steer + Step 3b detail (PR #215); attending must not add a 4th call.
+  expect(mocks.invoke).toHaveBeenCalledTimes(3)
 })
 
 it.each(['success', 'timeout', 'route_abort'] as const)('uses and cleans up the manual signal fallback: %s', async outcome => {

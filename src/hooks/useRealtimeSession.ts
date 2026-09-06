@@ -18,8 +18,7 @@ import {
   type UnresponsivenessConfig,
   type UnresponsivenessMonitor,
 } from '@/lib/voice/unresponsiveness'
-
-const MAX_LOCALIZER_INJECTIONS = 12
+import { ATTENDING_HINT_TOOL_NAME, buildNovaHint } from '@/lib/historian/novaSteer'
 
 // Preserve turn roles and the newest text, including a partial oldest turn.
 function boundLocalizerTranscript(turns: HistorianTranscriptEntry[]) {
@@ -59,6 +58,8 @@ interface UseRealtimeSessionOptions {
    * Set to false to disable entirely for testing or lightweight sessions.
    */
   enableLocalizer?: boolean
+  /** Fetch clinician detail separately after the live steer (default false). */
+  localizerDetail?: boolean
   /** Called when a new localizer result arrives. */
   onLocalizerUpdate?: (data: LocalizerResponse) => void
   /** Called when red flags are detected in patient speech. */
@@ -213,8 +214,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
-  const localizerPushCountRef = useRef(0)
   const localizerCycleRef = useRef(0)
+  // Nova: the latest unserved localizer hint, handed over when Henry calls get_attending_hint.
+  const pendingNovaHintRef = useRef<string | null>(null)
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
@@ -324,6 +326,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
   const localizerInFlightRef = useRef<boolean>(false)
+  const localizerAbortRef = useRef<AbortController | null>(null)
+  const detailInFlightRef = useRef<AbortController | null>(null)
+  const localizerDataRef = useRef<LocalizerResponse | null>(null)
+  const localizerResultCycleRef = useRef(0)
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -342,6 +348,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [options])
 
   const cleanup = useCallback(() => {
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
     // Stop the duration timer + auto-end timer. Transport teardown is owned
     // by the provider (provider.stop()), invoked from endSession / unmount —
     // NOT here, mirroring the pre-refactor split between React-side cleanup
@@ -417,10 +425,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * exact pre-refactor mechanism (no timeline pollution from accumulating
    * role:"system" messages).
    *
-   * Nova: has no instructions-overwrite primitive (a second SYSTEM block is
-   * rejected), so the delta is delivered as an advisory user-turn via
-   * injectSystemText, framed explicitly as private/physician-only context the
-   * model must not speak aloud or name to the patient.
+   * Nova: a PULL, not a push (2026-09-06). Nova has no instructions-overwrite
+   * primitive (a second SYSTEM block fails the stream); injectSystemText is an
+   * INTERACTIVE user turn Nova answers — when the steer started landing every
+   * cycle (#216) Henry launched a new question while the patient was still
+   * answering, then barge-in cut Henry off (5 of 7 pushes in the first prod
+   * session produced an extra utterance); and non-interactive text blocks are
+   * accepted silently but ignored. So the hint is parked in pendingNovaHintRef
+   * and served once when Henry calls get_attending_hint after the patient's
+   * next answer (tool offered + workflow paragraph by the session route when
+   * the client sends `steer`). See src/lib/historian/novaSteer.ts.
    *
    * Non-fatal: if the push fails, the interview continues on the prior
    * instructions. No retries.
@@ -453,21 +467,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
           provider.updateInstructions(updatedInstructions)
         } else {
-          // Nova path — skip injection if AI is mid-speech to avoid
-          // interruption and accidental vocalization of internal context.
-          if (isAiSpeakingRef.current) return
-          if (localizerPushCountRef.current >= MAX_LOCALIZER_INJECTIONS) return
-          const delta = [
-            `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
-            `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-            `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-            `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
-            ...attendingLines,
-            `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
-          ].join('\n')
-          // Count attempts too: a transport error must not allow unbounded retries.
-          localizerPushCountRef.current += 1
-          provider.injectSystemText(delta)
+          // Nova path — park the hint for the next get_attending_hint call
+          // (see the doc comment above). Never injectSystemText here: that is
+          // an interactive USER turn and Nova would answer it mid-answer.
+          // Always overwrite, null included: a later cycle with no question
+          // must clear an older hint rather than let it be served stale.
+          pendingNovaHintRef.current = buildNovaHint(pushPayload)
         }
       } catch (err) {
         console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
@@ -480,13 +485,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
     const localizerEnabled = options.enableLocalizer !== false // default true
-    if (!localizerEnabled) return
+    if (!localizerEnabled || finalizingRef.current) return
     if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
 
     localizerInFlightRef.current = true
     // Count SENT requests only, so a call swallowed by the in-flight guard never consumes a cycle number.
     const localizerCycle = ++localizerCycleRef.current
+    const sessionGen = sessionGenRef.current
+    const controller = new AbortController()
+    localizerAbortRef.current = controller
     setLocalizerLoading(true)
 
     // Grab last 8 turns for context
@@ -498,8 +506,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     try {
       const res = await fetch('/api/ai/historian/localizer', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mode: 'steer',
+          // Ask for detail_input only when this client will make the detail call (clinician mirror).
+          wantDetail: options.localizerDetail === true,
           sessionId: options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
           localizerCycle,
@@ -522,13 +534,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       const data: LocalizerResponse & { push_payload?: Parameters<typeof pushLocalizerContext>[0] } = await res.json()
 
-      // Update state for physician panel
-      setLocalizerData(data)
-      options.onLocalizerUpdate?.(data)
+      if (controller.signal.aborted || finalizingRef.current || sessionGen !== sessionGenRef.current) return
+      localizerResultCycleRef.current = localizerCycle
+      const { detail_input, ...steerData } = data
+      // Transport-only detail_input must never enter panel state or callbacks.
+      localizerDataRef.current = steerData
+      setLocalizerData(steerData)
+      options.onLocalizerUpdate?.(steerData)
 
       const pushPayload = data.push_payload
       if (shouldPushLocalizer({
-        speaking: isAiSpeakingRef.current,
+        // Mid-speech matters only for the OpenAI instructions rewrite; a Nova
+        // hint is merely parked, so arming it while Henry talks loses nothing.
+        speaking: providerRef.current?.updateInstructions ? isAiSpeakingRef.current : false,
         safetyEscalated: safetyEscalatedRef.current,
         payloadEmpty: !pushPayload || !(
           pushPayload.top_differentials?.some(value => value.trim()) ||
@@ -539,12 +557,56 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }) && pushPayload) {
         pushLocalizerContext(pushPayload)
       }
+
+      if (options.localizerDetail && detail_input) {
+        // A newer steer supersedes any older detail request.
+        detailInFlightRef.current?.abort()
+        const detailController = new AbortController()
+        detailInFlightRef.current = detailController
+        void (async () => {
+          try {
+            const detailRes = await fetch('/api/ai/historian/localizer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: detailController.signal,
+              body: JSON.stringify({ mode: 'detail', sessionId: options.consultId ?? 'ephemeral', detail_input }),
+            })
+            if (!detailRes.ok) return
+            const detail: LocalizerResponse = await detailRes.json()
+            if (detailController.signal.aborted || finalizingRef.current ||
+              sessionGen !== sessionGenRef.current || localizerCycle !== localizerResultCycleRef.current ||
+              !localizerDataRef.current || detail.partial) return
+            // Explicit allowlist: detail can only update clinician fields, never the push.
+            const merged: LocalizerResponse = { ...localizerDataRef.current,
+              differential: detail.differential, excluded: detail.excluded,
+              followUpQuestions: detail.followUpQuestions,
+              localizationHypothesis: detail.localizationHypothesis,
+              suggestedActions: detail.suggestedActions, confidence: detail.confidence,
+              // A clean detail must never clear a warning the steer itself raised (attending failed, plan
+              // evidence unavailable, timeout) — the panel's 'Partial analysis' banner stays until a clean steer.
+              partial: localizerDataRef.current.partial || detail.partial,
+              degradedReason: localizerDataRef.current.degradedReason ?? detail.degradedReason,
+              processingMs: detail.processingMs,
+            }
+            localizerDataRef.current = merged
+            setLocalizerData(merged)
+            options.onLocalizerUpdate?.(merged)
+          } catch {
+            // Non-fatal; retain the completed steer on detail failure.
+          } finally {
+            if (detailInFlightRef.current === detailController) detailInFlightRef.current = null
+          }
+        })()
+      }
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
       console.warn('[localizer] run failed (session continues):', err?.message)
     } finally {
-      localizerInFlightRef.current = false
-      setLocalizerLoading(false)
+      if (localizerAbortRef.current === controller) {
+        localizerAbortRef.current = null
+        localizerInFlightRef.current = false
+        if (!controller.signal.aborted) setLocalizerLoading(false)
+      }
     }
   }, [options, pushLocalizerContext])
 
@@ -615,6 +677,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const handleToolCall = useCallback((toolName: string, toolUseId: string, input: unknown) => {
     const provider = providerRef.current
     const args: any = (input && typeof input === 'object') ? input : {}
+
+    // ── get_attending_hint (Nova only): the localizer steer as a PULL ──
+    // Serve once — a hint must not repeat on every later turn; null tells
+    // Henry to continue with his own plan (src/lib/historian/novaSteer.ts).
+    if (toolName === ATTENDING_HINT_TOOL_NAME) {
+      const hint = pendingNovaHintRef.current
+      pendingNovaHintRef.current = null
+      provider?.sendToolResult(toolUseId, { hint })
+      return
+    }
 
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
@@ -1022,6 +1094,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setTranscript([])
     setCurrentAssistantText('')
     setCurrentUserText('')
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
+    localizerAbortRef.current = null
+    detailInFlightRef.current = null
+    localizerDataRef.current = null
+    pendingNovaHintRef.current = null
     setLocalizerData(null)
     transcriptRef.current = []
     questionCountRef.current = 0
@@ -1039,8 +1117,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     interviewCompletedRef.current = false
     finalizingRef.current = false
     precloseRejectedRef.current = false
-    localizerPushCountRef.current = 0
     localizerCycleRef.current = 0
+    pendingNovaHintRef.current = null
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
     flushTokenRef.current = null
@@ -1065,6 +1143,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           patientContext: options.patientContext,
           provider: options.provider,
           referral: options.referral,
+          // Nova: offer get_attending_hint + its workflow only when this
+          // session will actually run the localizer (mirrors localizerEnabled).
+          steer: options.enableLocalizer !== false,
         }),
       })
 
@@ -1182,6 +1263,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const endSession = useCallback(async () => {
     if (finalizingRef.current) return
     finalizingRef.current = true
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
     setStatus('ending')
 
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000)
