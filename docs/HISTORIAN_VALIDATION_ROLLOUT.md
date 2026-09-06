@@ -145,3 +145,8 @@ WHERE id = $1
 - This is substring coverage, not proof of complete answers or clinical validation; no LLM or database is used by the check.
 
 The hook owns the unified localizer channel: `runLocalizer` calls `pushLocalizerContext` once per eligible cycle for every consumer, skipping speech, safety escalation, and empty payloads; the embedded consumer retains its UI/scale handling without forwarding guidance. For pre-close rejection, OpenAI receives the internal note before the tool result triggers its response; Nova receives the tool result first, then the note as the forcing turn. The Nova ordering must be confirmed on a live session. Henry asks each missing item once, accepts declines or unknown answers without re-asking, and then saves again.
+
+## Patient-route steer flag (2026-09-05)
+- `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time; Amplify rebuild required) makes `NeurologicHistorian` run the localizer on `/patient/*` routes. Only Henry's private steer consumes the result (localizer hints and, with `HISTORIAN_ATTENDING_ENABLED`, attending-review gaps); the differential panel remains gated on the `clinicianMirror` prop, which no patient route sets.
+- Default off. Until it is on, `/patient/historian` runs the prompt alone — no localizer, no attending review — and only `/consult/triage-historian` exercises them.
+
