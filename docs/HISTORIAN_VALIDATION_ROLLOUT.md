@@ -172,10 +172,18 @@ oldest end to at most 60,000 text characters. Counters reset at session start.
 
 Both providers privately receive only the first sanitized attending gap as the
 next-question suggestion. Absent/empty gaps leave the delta byte-identical.
-Speaking and safety guards remain in place. Nova is limited to 12 localizer
-injection attempts per session; OpenAI instruction rewrites remain uncapped.
-Safety escalation and pre-close messages use their existing separate paths and
-are not charged against this localizer ceiling. No server flags are changed.
+Speaking and safety guards remain in place; OpenAI instruction rewrites remain
+uncapped. **Nova receives no localizer push (2026-09-06).** The relay can only
+deliver mid-session text as an interactive USER turn (a second SYSTEM block
+fails the stream), so each push made Nova start a new response while the
+patient was still answering — in the first prod session with the steer live,
+5 of 7 pushes produced an extra Henry utterance 5–7 s after a completed
+answer, then barge-in cut it off. On Nova the steer still feeds the clinician
+panel and the eval worker; Henry keeps the pre-steer behaviour. Restoring it
+needs a non-interactive relay frame (`contentStart.interactive = false` —
+verified silent and absorbed as context against Nova 2 Sonic on 2026-09-06).
+Safety escalation and pre-close messages use their existing separate paths.
+No server flags are changed.
 
 Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time, default off; PR #212); the clinician panel stays gated on `clinicianMirror`. Until that flag is on, attending gaps reach Henry only on `/consult/triage-historian` and the embedded consult flow.
 

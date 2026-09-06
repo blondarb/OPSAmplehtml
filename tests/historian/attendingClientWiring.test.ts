@@ -11,11 +11,12 @@ const boundSource = hook.slice(hook.indexOf('function boundLocalizerTranscript')
 // Execute the actual hook callbacks with ref/provider doubles, without a live
 // microphone, React renderer, server, or paid model call.
 function harness(openai = false, options: { localizerDetail?: boolean; onLocalizerUpdate?: ReturnType<typeof vi.fn> } = {}) {
-  const provider = openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn() } : { injectSystemText: vi.fn() }
+  const provider: { updateInstructions?: ReturnType<typeof vi.fn>; injectSystemText: ReturnType<typeof vi.fn> } =
+    openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn() } : { injectSystemText: vi.fn() }
   const refs = {
     providerRef: { current: provider }, baseInstructionsRef: { current: 'BASE' },
     isAiSpeakingRef: { current: false }, safetyEscalatedRef: { current: false },
-    localizerPushCountRef: { current: 0 }, localizerCycleRef: { current: 0 },
+    localizerCycleRef: { current: 0 },
     localizerInFlightRef: { current: false }, localizerResultCycleRef: { current: 0 },
     localizerAbortRef: { current: null }, detailInFlightRef: { current: null },
     localizerDataRef: { current: null }, finalizingRef: { current: false }, sessionGenRef: { current: 1 },
@@ -23,7 +24,7 @@ function harness(openai = false, options: { localizerDetail?: boolean; onLocaliz
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
   const env = { ...refs, fetch, options, shouldPushLocalizer, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
-  const source = `const MAX_LOCALIZER_INJECTIONS = 12;\n${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
+  const source = `${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
   return { ...callbacks, ...env, provider }
@@ -45,7 +46,7 @@ describe('attending client hook wiring', () => {
     expect(h.boundLocalizerTranscript([{ role: 'user', text: 'small' }])).toEqual([{ role: 'user', text: 'small' }])
   })
 
-  it('pushes once per cycle, caps Nova at 12, and leaves OpenAI updates uncapped', async () => {
+  it('pushes once per cycle on OpenAI and never hands Nova a user turn', async () => {
     for (const openai of [false, true]) {
       const h = harness(openai)
       for (let i = 0; i < 15; i++) await h.runLocalizer()
@@ -54,7 +55,7 @@ describe('attending client hook wiring', () => {
       if ('updateInstructions' in h.provider) {
         expect(h.provider.updateInstructions).toHaveBeenCalledTimes(15)
         expect(h.provider.injectSystemText).not.toHaveBeenCalled()
-      } else expect(h.provider.injectSystemText).toHaveBeenCalledTimes(12)
+      } else expect(h.provider.injectSystemText).not.toHaveBeenCalled()
     }
     expect(runSource.match(/pushLocalizerContext\(pushPayload\)/g)).toHaveLength(1)
   })
@@ -65,20 +66,24 @@ describe('attending client hook wiring', () => {
     await h.runLocalizer()
     expect(h.provider.injectSystemText).not.toHaveBeenCalled()
     const start = hook.slice(hook.indexOf('const startSession ='))
-    expect(start).toContain('precloseRejectedRef.current = false\n    localizerPushCountRef.current = 0\n    localizerCycleRef.current = 0')
+    expect(start).toContain('precloseRejectedRef.current = false\n    localizerCycleRef.current = 0')
     expect(readFileSync('src/components/consult/EmbeddedHistorian.tsx', 'utf8')).not.toMatch(/pushLocalizerContext(?:Ref)?/)
   })
 
-  it('adds exactly the first gap line in both deltas and preserves legacy bytes when absent or empty', () => {
-    for (const openai of [false, true]) {
+  it('never delivers the localizer steer to Nova as an interactive user turn', () => {
+    const h = harness()
+    h.pushLocalizerContext({ top_differentials: ['x'], suggested_next_question: 'y?', suggested_scale_id: 'z', attending_gaps: ['First?'] })
+    expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+    expect(pushSource).not.toMatch(/\.injectSystemText\(/)
+  })
+
+  it('adds exactly the first gap line to the OpenAI delta and preserves legacy bytes when absent or empty', () => {
+    for (const openai of [true]) {
       const h = harness(openai)
-      const output = () => 'updateInstructions' in h.provider
-        ? h.provider.updateInstructions.mock.calls.at(-1)![0]
-        : h.provider.injectSystemText.mock.calls.at(-1)![0]
+      const output = () => h.provider.updateInstructions!.mock.calls.at(-1)![0]
       h.pushLocalizerContext({})
-      const legacy = openai
-        ? 'BASE\n\n[LATEST LOCALIZER PUSH]\n- Top differentials: (none yet)\n- Suggested next question: (none)\n- Suggested scale to consider: (none)'
-        : '[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]\n[Localizer update]\n- Differentials (private): (none yet)\n- Suggested angle for next question (silent): (none)\n- Scale to consider (do not name to patient): (none)'
+      const legacy =
+        'BASE\n\n[LATEST LOCALIZER PUSH]\n- Top differentials: (none yet)\n- Suggested next question: (none)\n- Suggested scale to consider: (none)'
       expect(output()).toBe(legacy)
       h.pushLocalizerContext({ attending_gaps: [] })
       expect(output()).toBe(legacy)
@@ -118,11 +123,11 @@ const flushDetail = async () => { for (let i = 0; i < 8; i++) await Promise.reso
 
 it('pushes before unresolved detail, then merges only clinician fields with a second callback', async () => {
   const onLocalizerUpdate = vi.fn()
-  const h = harness(false, { localizerDetail: true, onLocalizerUpdate })
+  const h = harness(true, { localizerDetail: true, onLocalizerUpdate })
   let resolveDetail!: (value: unknown) => void
   h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
   await h.runLocalizer()
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
   expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
   expect(JSON.parse(h.fetch.mock.calls[1][1].body)).toMatchObject({ mode: 'detail', detail_input: steerResponse.detail_input })
   resolveDetail(response(detailResponse))
@@ -132,7 +137,7 @@ it('pushes before unresolved detail, then merges only clinician fields with a se
   expect(h.localizerDataRef.current).toMatchObject({ differential: detailResponse.differential,
     push_payload: steerResponse.push_payload, kbSources: steerResponse.kbSources })
   expect(h.localizerDataRef.current).not.toHaveProperty('detail_input')
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
   expect(h.detailInFlightRef.current).toBeNull()
 })
 
@@ -154,7 +159,7 @@ it('defaults to steer only even when transport inputs are returned', async () =>
 })
 
 it.each(['newer cycle', 'ended', 'new session', 'aborted', 'failed detail'])('drops late detail after %s', async reason => {
-  const h = harness(false, { localizerDetail: true })
+  const h = harness(true, { localizerDetail: true })
   let resolveDetail!: (value: unknown) => void
   h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
   await h.runLocalizer()
@@ -165,5 +170,5 @@ it.each(['newer cycle', 'ended', 'new session', 'aborted', 'failed detail'])('dr
   resolveDetail(response({ ...detailResponse, partial: reason === 'failed detail' }))
   await flushDetail()
   expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
 })

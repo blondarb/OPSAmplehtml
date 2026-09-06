@@ -19,8 +19,6 @@ import {
   type UnresponsivenessMonitor,
 } from '@/lib/voice/unresponsiveness'
 
-const MAX_LOCALIZER_INJECTIONS = 12
-
 // Preserve turn roles and the newest text, including a partial oldest turn.
 function boundLocalizerTranscript(turns: HistorianTranscriptEntry[]) {
   let remaining = 60_000
@@ -215,7 +213,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
-  const localizerPushCountRef = useRef(0)
   const localizerCycleRef = useRef(0)
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
@@ -425,10 +422,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * exact pre-refactor mechanism (no timeline pollution from accumulating
    * role:"system" messages).
    *
-   * Nova: has no instructions-overwrite primitive (a second SYSTEM block is
-   * rejected), so the delta is delivered as an advisory user-turn via
-   * injectSystemText, framed explicitly as private/physician-only context the
-   * model must not speak aloud or name to the patient.
+   * Nova: NO push (2026-09-06). Nova has no instructions-overwrite primitive
+   * (a second SYSTEM block fails the stream), and the only relay channel,
+   * injectSystemText, is an INTERACTIVE user turn — Nova answers it. When the
+   * steer started landing every cycle (#216) that meant Henry launched a new
+   * question while the patient was still answering, then barge-in cut Henry
+   * off (5 of 7 pushes in the first prod session produced an extra
+   * utterance). A non-interactive USER text block (contentStart.interactive
+   * = false) is accepted silently and used as context — verified against
+   * Nova 2 Sonic on 2026-09-06 — but needs a new relay frame; until that
+   * ships, the steer is OpenAI-only and Nova keeps the pre-steer behaviour.
    *
    * Non-fatal: if the push fails, the interview continues on the prior
    * instructions. No retries.
@@ -461,21 +464,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
           provider.updateInstructions(updatedInstructions)
         } else {
-          // Nova path — skip injection if AI is mid-speech to avoid
-          // interruption and accidental vocalization of internal context.
-          if (isAiSpeakingRef.current) return
-          if (localizerPushCountRef.current >= MAX_LOCALIZER_INJECTIONS) return
-          const delta = [
-            `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
-            `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-            `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-            `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
-            ...attendingLines,
-            `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
-          ].join('\n')
-          // Count attempts too: a transport error must not allow unbounded retries.
-          localizerPushCountRef.current += 1
-          provider.injectSystemText(delta)
+          // Nova path — intentionally no delivery. injectSystemText is an
+          // interactive USER turn on the relay, so a push here makes Nova
+          // start a new response mid-answer (see the doc comment above).
+          // The steer still feeds the clinician panel and the eval worker.
+          return
         }
       } catch (err) {
         console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
@@ -1107,7 +1100,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     interviewCompletedRef.current = false
     finalizingRef.current = false
     precloseRejectedRef.current = false
-    localizerPushCountRef.current = 0
     localizerCycleRef.current = 0
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
