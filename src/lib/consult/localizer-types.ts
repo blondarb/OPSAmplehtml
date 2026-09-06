@@ -157,7 +157,7 @@ export interface AttendingMeta {
   ran: boolean
   duration_ms?: number
   dropped_turns?: number
-  reason?: 'disabled' | 'safety' | 'interval' | 'too_short' | 'timeout' | 'error'
+  reason?: 'disabled' | 'no_cycle' | 'safety' | 'interval' | 'too_short' | 'timeout' | 'error'
 }
 
 export interface LocalizerPushPayload {

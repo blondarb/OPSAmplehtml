@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
+const originalAny = AbortSignal.any
+
 const mocks = vi.hoisted(() => ({ invoke: vi.fn() }))
 vi.mock('@/lib/bedrock', () => ({ invokeBedrockJSON: mocks.invoke }))
 vi.mock('@/lib/db', () => ({ getNeuroPlansPool: vi.fn().mockResolvedValue({}) }))
@@ -23,7 +25,7 @@ beforeEach(() => {
     : opts.system.includes('Generate clinically targeted follow-up questions') ? step3
     : { primarySymptoms: ['synthetic symptom'], redFlags: [], clinicalSummary: 'Synthetic summary' } }))
 })
-afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); vi.useRealTimers() })
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); Object.defineProperty(AbortSignal, 'any', { value: originalAny, configurable: true, writable: true }); vi.useRealTimers() })
 
 it('flag off preserves Step 3 and omits attending fields for an old client', async () => {
   const response = await POST(request())
@@ -50,7 +52,7 @@ it('runs on interval with full transcript and returns at most three sanitized qu
   expect(opts.model).toBeUndefined() // Same helper default as Step 3.
 })
 
-it.each([{ safetyEscalated: true, localizerCycle: 2 }, { localizerCycle: 3 }])('skips when gated: %j', async extra => {
+it.each([...[true, 'true', 1, '1'].map(safetyEscalated => ({ safetyEscalated, localizerCycle: 2 })), { localizerCycle: 3 }])('skips when gated: %j', async extra => {
   vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', 'true')
   const body = await (await POST(request(extra))).json()
   expect(body.attending_meta.ran).toBe(false)
@@ -103,4 +105,57 @@ it('starts Step 4 while Step 3 is pending and isolates its timeout', async () =>
   expect(body.followUpQuestions).toEqual(step3.followUpQuestions)
   expect(body.attending_meta.reason).toBe('timeout')
   expect(body.partial).toBe(false)
+})
+
+it('skips enabled review for old clients with a fixed eight-turn window', async () => {
+  vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', 'true')
+  const body = await (await POST(request())).json()
+  expect(body.attending_meta).toEqual({ ran: false, reason: 'no_cycle' })
+  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+})
+
+it('isolates a signal-composition setup throw before Bedrock', async () => {
+  vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', 'true')
+  vi.spyOn(AbortSignal, 'any').mockImplementation(() => { throw new Error('Synthetic setup failure') })
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const response = await POST(request({ localizerCycle: 2 }))
+  const body = await response.json()
+  expect(response.status).toBe(200)
+  expect(body).toMatchObject({ ...step3, partial: false, attending_gaps: [], attending_meta: { reason: 'error' } })
+  expect(body.push_payload.suggested_next_question).toBe(step3.followUpQuestions[0])
+  expect(mocks.invoke).toHaveBeenCalledTimes(2)
+})
+
+it.each(['success', 'timeout', 'route_abort'] as const)('uses and cleans up the manual signal fallback: %s', async outcome => {
+  vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', 'true')
+  Object.defineProperty(AbortSignal, 'any', { value: undefined, configurable: true, writable: true })
+  vi.useFakeTimers()
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const original = mocks.invoke.getMockImplementation()!
+  let startedStep4!: () => void
+  const started = new Promise<void>(resolve => { startedStep4 = resolve })
+  let routeSignal!: AbortSignal
+  let removeListener!: ReturnType<typeof vi.spyOn>
+  mocks.invoke.mockImplementation(opts => {
+    if (!isAttending(opts)) {
+      routeSignal = opts.signal
+      return original(opts)
+    }
+    removeListener = vi.spyOn(routeSignal, 'removeEventListener')
+    startedStep4()
+    if (outcome === 'success') return original(opts)
+    return new Promise((_, reject) => opts.signal.addEventListener('abort', () => reject(new Error('Synthetic abort')), { once: true }))
+  })
+  const pending = POST(request({ localizerCycle: 2 }))
+  await started
+  if (outcome === 'timeout') await vi.advanceTimersByTimeAsync(8000)
+  if (outcome === 'route_abort') routeSignal.dispatchEvent(new Event('abort'))
+  const response = await pending
+  const body = await response.json()
+  expect(response.status).toBe(200)
+  expect(body.followUpQuestions).toEqual(step3.followUpQuestions)
+  if (outcome === 'success') expect(body.attending_gaps).toHaveLength(3)
+  else expect(body.attending_meta.reason).toBe('timeout')
+  expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function))
+  expect(vi.getTimerCount()).toBe(0)
 })

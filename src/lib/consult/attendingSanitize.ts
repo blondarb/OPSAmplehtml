@@ -1,10 +1,10 @@
-/** Reuse the evaluator's disease-name lexicon, not its assertion-only matcher:
- * even questions must not name diagnoses here. Migraine (including with aura)
- * is blocked consistently with that lexicon; plain symptom vocabulary is allowed.
- * Supplement its five syndrome groups with conservative common diagnosis terms.
- * This lexical screen is not a complete clinical-language validator.
+/** Diagnosis names are blocked even in questions; plain symptom vocabulary is
+ * allowed (including seizures, migraines, headache, weakness, and memory loss).
+ * Diagnosis phrases such as seizure disorder and cluster headache remain blocked.
+ * Acronyms are case-sensitive; names are case-insensitive, with word boundaries.
+ * This finite lexical screen is not a complete clinical-language validator.
  */
-import { SYNDROME_DISEASE_NAMES } from '@/lib/historian/eval/rubric'
+import { ATTENDING_DIAGNOSIS_NAMES, ATTENDING_DIAGNOSIS_ACRONYMS } from './attendingLexicon'
 
 export interface AttendingGap {
   topic: string
@@ -12,14 +12,10 @@ export interface AttendingGap {
   why: string
 }
 
-const terms = [
-  ...Object.values(SYNDROME_DISEASE_NAMES).flat(),
-  'MS', 'Parkinson', 'Parkinsons', 'ALS', 'myasthenia', 'Guillain',
-  'tumor', 'tumour', 'cancer', 'aneurysm', 'meningitis', 'encephalitis',
-]
-const diagnosisPattern = new RegExp(`\\b(?:${terms.map(term =>
-  term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-).join('|')})\\b`, 'i')
+const escapeTerm = (term: string) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const diagnosisPattern = new RegExp(`\\b(?:${ATTENDING_DIAGNOSIS_NAMES.map(escapeTerm).join('|')})\\b`, 'i')
+const acronymPattern = new RegExp(`\\b(?:${ATTENDING_DIAGNOSIS_ACRONYMS.map(escapeTerm).join('|')})\\b`)
+const namesDiagnosis = (text: string) => diagnosisPattern.test(text) || acronymPattern.test(text)
 
 export function sanitizeAttendingGaps(raw: unknown): AttendingGap[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
@@ -34,7 +30,7 @@ export function sanitizeAttendingGaps(raw: unknown): AttendingGap[] {
     if (typeof topic !== 'string' || typeof question !== 'string' || typeof why !== 'string') continue
     const entry = { topic: topic.trim(), question: question.trim(), why: why.trim() }
     if (!entry.topic || !entry.question || !entry.why || entry.question.length > 160) continue
-    if (diagnosisPattern.test(entry.topic) || diagnosisPattern.test(entry.question)) continue
+    if (namesDiagnosis(entry.topic) || namesDiagnosis(entry.question)) continue
     const key = entry.topic.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)

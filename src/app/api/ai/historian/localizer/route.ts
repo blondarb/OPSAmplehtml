@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { invokeBedrockJSON } from '@/lib/bedrock'
-import { buildAttendingTranscriptWindow, getAttendingConfig, shouldRunAttending } from '@/lib/consult/attendingGaps'
+import { buildAttendingTranscriptWindow, getAttendingConfig, isAttendingSafetyEscalated, shouldRunAttending } from '@/lib/consult/attendingGaps'
 import { buildAttendingPrompt } from '@/lib/consult/attendingPrompt'
 import { sanitizeAttendingGaps } from '@/lib/consult/attendingSanitize'
 import { from } from '@/lib/db-query'
@@ -312,28 +312,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let attendingGaps: string[] | undefined
   let attendingMeta: AttendingMeta | undefined
-  const attendingConfig = getAttendingConfig()
-
   async function runAttending(): Promise<void> {
-    // Preserve the old response shape and avoid inspecting new input when disabled.
-    if (!attendingConfig.enabled) return
-    const turns = body.fullTranscript ?? transcript
-    const gate = {
-      ...attendingConfig,
-      localizerCycle: body.localizerCycle,
-      transcriptTurnCount: Array.isArray(turns) ? turns.length : 0,
-      safetyEscalated: body.safetyEscalated === true,
-    }
-    if (!shouldRunAttending(gate)) {
-      attendingMeta = { ran: false, reason: gate.safetyEscalated ? 'safety'
-        : gate.transcriptTurnCount < 6 ? 'too_short' : 'interval' }
-      return
-    }
     const started = Date.now()
-    const attendingSignal = AbortSignal.any([signal, AbortSignal.timeout(ATTENDING_TIMEOUT_MS)])
-    attendingMeta = { ran: true }
-    attendingGaps = []
+    let attendingSignal: AbortSignal | undefined
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+    let onRouteAbort: (() => void) | undefined
     try {
+      // Every optional Step 4 setup operation must fail independently of Steps 1–3.
+      const attendingConfig = getAttendingConfig()
+      if (!attendingConfig.enabled) return
+      const turns = body.fullTranscript ?? transcript
+      const gate = {
+        ...attendingConfig,
+        localizerCycle: body.localizerCycle,
+        transcriptTurnCount: Array.isArray(turns) ? turns.length : 0,
+        safetyEscalated: isAttendingSafetyEscalated(body.safetyEscalated),
+      }
+      if (!shouldRunAttending(gate)) {
+        attendingMeta = { ran: false, reason: gate.safetyEscalated ? 'safety'
+          : gate.localizerCycle === undefined ? 'no_cycle'
+          : gate.transcriptTurnCount < 6 ? 'too_short' : 'interval' }
+        return
+      }
+      attendingMeta = { ran: true }
+      attendingGaps = []
+      if (typeof AbortSignal.any === 'function') {
+        attendingSignal = AbortSignal.any([signal, AbortSignal.timeout(ATTENDING_TIMEOUT_MS)])
+      } else {
+        const combined = new AbortController()
+        attendingSignal = combined.signal
+        onRouteAbort = () => combined.abort(signal.reason)
+        signal.addEventListener('abort', onRouteAbort, { once: true })
+        fallbackTimer = setTimeout(() => combined.abort(), ATTENDING_TIMEOUT_MS)
+        if (signal.aborted) onRouteAbort()
+      }
+      attendingSignal.throwIfAborted()
       if (!Array.isArray(turns) || !turns.every(t => t &&
         (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string')) {
         throw new Error('Invalid attending transcript shape')
@@ -353,12 +366,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       attendingSignal.throwIfAborted()
       attendingGaps = sanitizeAttendingGaps(parsed).map(gap => gap.question)
     } catch {
-      attendingMeta.reason = attendingSignal.aborted ? 'timeout' : 'error'
-      console.warn(attendingSignal.aborted
+      attendingGaps = []
+      attendingMeta = { ...attendingMeta, ran: true, reason: attendingSignal?.aborted ? 'timeout' : 'error' }
+      console.warn(attendingSignal?.aborted
         ? '[localizer] Step 4 (attending review) timeout'
         : '[localizer] Step 4 (attending review) failed', { duration_ms: Date.now() - started })
     } finally {
-      attendingMeta.duration_ms = Date.now() - started
+      if (fallbackTimer !== undefined) clearTimeout(fallbackTimer)
+      if (onRouteAbort) signal.removeEventListener('abort', onRouteAbort)
+      if (attendingMeta?.ran) attendingMeta.duration_ms = Date.now() - started
     }
   }
 

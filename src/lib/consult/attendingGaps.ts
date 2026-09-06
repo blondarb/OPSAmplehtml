@@ -21,9 +21,7 @@ export function shouldRunAttending(input: {
 }): boolean {
   const { enabled, interval, localizerCycle, transcriptTurnCount, safetyEscalated } = input
   if (!enabled || safetyEscalated || transcriptTurnCount < 6) return false
-  return typeof localizerCycle === 'number'
-    ? localizerCycle % interval === 0
-    : transcriptTurnCount % (interval * 2) === 0
+  return typeof localizerCycle === 'number' && localizerCycle % interval === 0
 }
 
 /** Keep a contiguous suffix of whole turns; budget includes role labels/newlines.
@@ -41,4 +39,9 @@ export function buildAttendingTranscriptWindow(turns: AttendingTurn[], maxChars 
     start--
   }
   return { window: turns.slice(start), dropped_turns: start }
+}
+
+/** Only the explicitly supported wire values mean safety escalation. */
+export function isAttendingSafetyEscalated(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1'
 }
