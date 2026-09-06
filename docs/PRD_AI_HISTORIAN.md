@@ -11,6 +11,17 @@
 
 ---
 
+### 2026-09-05 depth fix
+- A short or one-line referral does not shrink the configured interview budget (default 45–60 turns).
+- Phase 3 requires direct patient questions for background history; referral/PATIENT CONTEXT mentions alone do not count.
+- Medication history covers name, dose, frequency, start date, prescriber, and missed doses; allergies remain a separate item.
+- Alcohol has its own question sequence: typical week, most in one sitting, last drink, and symptoms when cutting back.
+- Family and social history remain required coverage; the referral guard and final turn checklist reinforce direct questioning.
+- The save tool adds optional `alcohol_use`; required fields and the scope-locked referral-clarification prompt are unchanged.
+- Offline checks verify prompt/schema contracts only; interview behavior has not been validated by a live run.
+
+- Review fix (2026-09-05): the Phase 3 "asked directly" save gate now names its two overrides explicitly — PATIENT-INITIATED ENDING and the TURN LIMIT (rule 13) — and rule 13 carries a turn-cap exception so the model never has to resolve an unstated conflict near the safety ceiling.
+
 ## 1. Overview
 
 The AI Neurologic Historian is a voice-powered patient intake interview system that conducts structured neurological history-taking before patients see their neurologist. Using OpenAI's Realtime API over WebRTC, it provides a natural conversational experience where an AI conducts the interview entirely by voice.
