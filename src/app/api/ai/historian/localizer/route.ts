@@ -712,7 +712,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     ...response,
-    ...(mode === 'steer' && symptoms ? { detail_input: {
+    // detail_input is transport for the clinician mirror's follow-up call only: a patient-route
+    // browser never asks for it (wantDetail absent) and must not receive extracted reasoning.
+    ...(mode === 'steer' && symptoms && parsedBody.wantDetail === true ? { detail_input: {
       extractedSymptoms: symptoms,
       guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
       chiefComplaint: chiefComplaint ?? null, sessionType,

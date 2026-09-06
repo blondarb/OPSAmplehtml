@@ -513,6 +513,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'steer',
+          // Ask for detail_input only when this client will make the detail call (clinician mirror).
+          wantDetail: options.localizerDetail === true,
           sessionId: options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
           localizerCycle,

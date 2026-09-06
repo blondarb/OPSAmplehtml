@@ -145,7 +145,7 @@ it('drops a steer question that names a diagnosis before it can reach Henry', as
 it.each([false, true])('steer skips detail and returns transport inputs, attending gated = %s', async attending => {
   vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', String(attending))
   vi.stubEnv('HISTORIAN_ATTENDING_INTERVAL', '1')
-  const response = await POST(request({ mode: 'steer', localizerCycle: 1,
+  const response = await POST(request({ mode: 'steer', wantDetail: true, localizerCycle: 1,
     fullTranscript: Array.from({ length: 6 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: 'Synthetic turn' })) }))
   const body = await response.json()
   expect(body).toMatchObject({ partial: false, detail_input: detailInput, excluded: [],
@@ -222,4 +222,10 @@ it.each([undefined, null, {}, { ...detailInput, extractedSymptoms: {} },
 ])('rejects missing or invalid detail inputs without model work: %j', async detail_input => {
   expect((await POST(request({ mode: 'detail', detail_input }))).status).toBe(400)
   expect(mocks.invoke).not.toHaveBeenCalled()
+})
+
+it('omits detail_input from a steer response unless the client asked for it (patient route)', async () => {
+  const body = await (await POST(request({ mode: 'steer', localizerCycle: 1 }))).json()
+  expect(body).not.toHaveProperty('detail_input')
+  expect(body.push_payload.suggested_next_question).toBeTruthy()
 })

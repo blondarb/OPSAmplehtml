@@ -40,6 +40,8 @@ export interface LocalizerDetailRequest {
 
 export interface LocalizerRequest {
   mode?: 'full' | 'steer'
+  /** Steer mode only: ask for detail_input so this client can make the follow-up detail call (clinician mirror). */
+  wantDetail?: boolean
   fullTranscript?: Array<{ role: 'user' | 'assistant'; text: string }>
   localizerCycle?: number
   safetyEscalated?: boolean

@@ -95,6 +95,7 @@ describe('attending client hook wiring', () => {
 
 it('pins off-cycle opt-in, transport-only inputs, and lifecycle cancellation', () => {
   expect(runSource).toContain("mode: 'steer'")
+  expect(runSource).toContain('wantDetail: options.localizerDetail === true')
   expect(runSource).toContain('if (options.localizerDetail && detail_input)')
   expect(runSource).toContain('void (async () =>')
   expect(runSource).toContain('const { detail_input, ...steerData } = data')
