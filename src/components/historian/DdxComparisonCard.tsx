@@ -1,13 +1,13 @@
 'use client'
 
 import { INVESTIGATIONAL_BANNER } from '@/lib/historian/eval/constants'
-import type { DifferentialItem, FinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { DifferentialItem, FinalDifferentialRecord } from '@/lib/historian/eval/finalDifferential'
 import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
 import type { AgreementResult } from '@/lib/historian/eval/agreement'
 
 export interface DdxComparisonCardProps {
   /** Task 2's pipeline differential (historian_sessions.final_differential). Null/undefined = pending. */
-  finalDifferential: FinalDifferential | null | undefined
+  finalDifferential: FinalDifferentialRecord | null | undefined
   /** Task 4's independent DeepSeek-R1 differential (historian_evaluations, evaluator='independent_ddx'). Null/undefined = pending. */
   independentDdx: IndependentDifferential | null | undefined
   /** Task 4's agreement metrics between the two above (historian_evaluations, evaluator='agreement'). Null/undefined = pending (or skipped — e.g. one side never completed). */
@@ -307,10 +307,10 @@ export default function DdxComparisonCard({
         <DifferentialColumn
           title="Pipeline Differential"
           modelBadge="Sonnet"
-          differential={finalDifferential?.differential}
-          summary={finalDifferential?.summary}
-          provenance={finalDifferential?.provenance}
-          pendingLabel="Pipeline differential pending — the post-session review pass has not completed yet."
+          differential={finalDifferential && 'differential' in finalDifferential ? finalDifferential.differential : undefined}
+          summary={finalDifferential && 'differential' in finalDifferential ? finalDifferential.summary : undefined}
+          provenance={finalDifferential && 'differential' in finalDifferential ? finalDifferential.provenance : undefined}
+          pendingLabel={finalDifferential?.status === 'error' ? `Pipeline differential failed (${finalDifferential.error_class}).` : "Pipeline differential pending — the post-session review pass has not completed yet."}
           onQuoteClick={onQuoteClick}
         />
         <div style={{ width: 1, background: 'rgba(100,116,139,0.15)', alignSelf: 'stretch' }} />

@@ -1154,9 +1154,4 @@ injection attempts per session; OpenAI instruction rewrites remain uncapped.
 Safety escalation and pre-close messages use their existing separate paths and
 are not charged against this localizer ceiling. No server flags are changed.
 
-Standalone-channel limitation: `/patient/historian` uses NeurologicHistorian with
-`enableLocalizer: clinicianMirror` (false by default). Hook ownership eliminates
-a dependency on the embedded component, but does not enable localizer calls on
-that patient page. Changing that opt-in is deferred outside this client scope.
-These are source-level guarantees; live voice behavior and clinical acceptance
-require separately authorized validation.
+Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time, default off; PR #212); the clinician panel stays gated on `clinicianMirror`. Until that flag is on, attending gaps reach Henry only on `/consult/triage-historian` and the embedded consult flow.

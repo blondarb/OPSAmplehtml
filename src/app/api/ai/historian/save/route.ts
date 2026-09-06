@@ -5,6 +5,7 @@ import { from } from '@/lib/db-query'
 import { linkHistorianToConsult } from '@/lib/consult/pipeline'
 import { notifyHistorianRedFlag } from '@/lib/notifications'
 import { validateTranscript } from '@/lib/historian/transcriptIntegrity'
+import { selectHistorianEvalMode } from '@/lib/historian/eval/evalMode'
 import { runFinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import { runThoroughnessJudge } from '@/lib/historian/eval/thoroughnessJudge'
 import { runIndependentDdxAndAgreement } from '@/lib/historian/eval/independentDdx'
@@ -115,52 +116,69 @@ export async function POST(request: Request) {
     // in-memory value from the Task 2 stage above) so agreement runs only
     // when that column is actually populated — skipping quietly otherwise.
     if (data && process.env.HISTORIAN_EVAL_AUTORUN !== 'false') {
-      const transcriptForEval: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
-        ? body.transcript
-        : []
-      const chiefComplaintForEval: string | undefined =
-        body.structured_output?.chief_complaint || body.referral_reason || undefined
-      const structuredOutputForEval = body.structured_output || null
-      const narrativeSummaryForEval: string | undefined =
-        typeof body.narrative_summary === 'string' && body.narrative_summary.trim()
-          ? body.narrative_summary
-          : undefined
+      if (selectHistorianEvalMode(process.env.HISTORIAN_EVAL_MODE) === 'queue') {
+        try {
+          const { getPool } = await import('@/lib/db')
+          const pool = await getPool()
+          await pool.query('UPDATE historian_sessions SET final_differential = $1 WHERE id = $2', [
+            JSON.stringify({ status: 'pending', queued_at: new Date().toISOString(), source: 'save' }),
+            data.id,
+          ])
+        } catch (err: unknown) {
+          if ((err as { code?: string })?.code === '42703') {
+            console.info('[historian/save] evaluation column not available yet')
+          } else {
+            console.error('[historian/save] pending evaluation marker failed (non-fatal)')
+          }
+        }
+      } else {
+        const transcriptForEval: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
+          ? body.transcript
+          : []
+        const chiefComplaintForEval: string | undefined =
+          body.structured_output?.chief_complaint || body.referral_reason || undefined
+        const structuredOutputForEval = body.structured_output || null
+        const narrativeSummaryForEval: string | undefined =
+          typeof body.narrative_summary === 'string' && body.narrative_summary.trim()
+            ? body.narrative_summary
+            : undefined
 
-      const finalDifferentialSettled = runFinalDifferential(
-        data.id,
-        transcriptForEval,
-        chiefComplaintForEval,
-      ).catch((err) => {
-        console.error('[historian/save] final differential eval error (non-fatal):', err)
-      })
-
-      const thoroughnessSettled = finalDifferentialSettled
-        .then(() =>
-          runThoroughnessJudge(data.id, transcriptForEval, {
-            chiefComplaint: chiefComplaintForEval,
-            structuredOutput: structuredOutputForEval,
-            narrativeSummary: narrativeSummaryForEval,
-            // SCOPE (Task 3 review): narrative_summary is the only report
-            // that exists at save time — other physician/QA-facing reports
-            // (the patient-report tab, a future printed chart note, Task
-            // 2's FinalDifferential.summary) are generated later, at VIEW
-            // time, not here. Task 5's batch harness is the intended
-            // extension point for passing additional reports into the
-            // fidelity screen; this route deliberately stays narrow.
-            reports: narrativeSummaryForEval ? { narrative_summary: narrativeSummaryForEval } : undefined,
-          }),
-        )
-        .catch((err) => {
-          console.error('[historian/save] thoroughness judge eval error (non-fatal):', err)
+        const finalDifferentialSettled = runFinalDifferential(
+          data.id,
+          transcriptForEval,
+          chiefComplaintForEval,
+        ).catch((err) => {
+          console.error('[historian/save] final differential eval error (non-fatal):', err)
         })
 
-      void thoroughnessSettled
-        .then(() =>
-          runIndependentDdxAndAgreement(data.id, transcriptForEval, chiefComplaintForEval),
-        )
-        .catch((err) => {
-          console.error('[historian/save] independent ddx / agreement eval error (non-fatal):', err)
-        })
+        const thoroughnessSettled = finalDifferentialSettled
+          .then(() =>
+            runThoroughnessJudge(data.id, transcriptForEval, {
+              chiefComplaint: chiefComplaintForEval,
+              structuredOutput: structuredOutputForEval,
+              narrativeSummary: narrativeSummaryForEval,
+              // SCOPE (Task 3 review): narrative_summary is the only report
+              // that exists at save time — other physician/QA-facing reports
+              // (the patient-report tab, a future printed chart note, Task
+              // 2's FinalDifferential.summary) are generated later, at VIEW
+              // time, not here. Task 5's batch harness is the intended
+              // extension point for passing additional reports into the
+              // fidelity screen; this route deliberately stays narrow.
+              reports: narrativeSummaryForEval ? { narrative_summary: narrativeSummaryForEval } : undefined,
+            }),
+          )
+          .catch((err) => {
+            console.error('[historian/save] thoroughness judge eval error (non-fatal):', err)
+          })
+
+        void thoroughnessSettled
+          .then(() =>
+            runIndependentDdxAndAgreement(data.id, transcriptForEval, chiefComplaintForEval),
+          )
+          .catch((err) => {
+            console.error('[historian/save] independent ddx / agreement eval error (non-fatal):', err)
+          })
+      }
     }
 
     // Phase 1 pipeline: link the saved historian session back to the consult

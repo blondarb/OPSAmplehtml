@@ -479,13 +479,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
-    const localizerCycle = ++localizerCycleRef.current
     const localizerEnabled = options.enableLocalizer !== false // default true
     if (!localizerEnabled) return
     if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
 
     localizerInFlightRef.current = true
+    // Count SENT requests only, so a call swallowed by the in-flight guard never consumes a cycle number.
+    const localizerCycle = ++localizerCycleRef.current
     setLocalizerLoading(true)
 
     // Grab last 8 turns for context
