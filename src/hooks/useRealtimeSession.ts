@@ -18,6 +18,7 @@ import {
   type UnresponsivenessConfig,
   type UnresponsivenessMonitor,
 } from '@/lib/voice/unresponsiveness'
+import { ATTENDING_HINT_TOOL_NAME, buildNovaHint } from '@/lib/historian/novaSteer'
 
 // Preserve turn roles and the newest text, including a partial oldest turn.
 function boundLocalizerTranscript(turns: HistorianTranscriptEntry[]) {
@@ -214,6 +215,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
   const localizerCycleRef = useRef(0)
+  // Nova: the latest unserved localizer hint, handed over when Henry calls get_attending_hint.
+  const pendingNovaHintRef = useRef<string | null>(null)
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
@@ -422,16 +425,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * exact pre-refactor mechanism (no timeline pollution from accumulating
    * role:"system" messages).
    *
-   * Nova: NO push (2026-09-06). Nova has no instructions-overwrite primitive
-   * (a second SYSTEM block fails the stream), and the only relay channel,
-   * injectSystemText, is an INTERACTIVE user turn — Nova answers it. When the
-   * steer started landing every cycle (#216) that meant Henry launched a new
-   * question while the patient was still answering, then barge-in cut Henry
-   * off (5 of 7 pushes in the first prod session produced an extra
-   * utterance). A non-interactive USER text block (contentStart.interactive
-   * = false) is accepted silently and used as context — verified against
-   * Nova 2 Sonic on 2026-09-06 — but needs a new relay frame; until that
-   * ships, the steer is OpenAI-only and Nova keeps the pre-steer behaviour.
+   * Nova: a PULL, not a push (2026-09-06). Nova has no instructions-overwrite
+   * primitive (a second SYSTEM block fails the stream); injectSystemText is an
+   * INTERACTIVE user turn Nova answers — when the steer started landing every
+   * cycle (#216) Henry launched a new question while the patient was still
+   * answering, then barge-in cut Henry off (5 of 7 pushes in the first prod
+   * session produced an extra utterance); and non-interactive text blocks are
+   * accepted silently but ignored. So the hint is parked in pendingNovaHintRef
+   * and served once when Henry calls get_attending_hint after the patient's
+   * next answer (tool offered + workflow paragraph by the session route when
+   * the client sends `steer`). See src/lib/historian/novaSteer.ts.
    *
    * Non-fatal: if the push fails, the interview continues on the prior
    * instructions. No retries.
@@ -464,11 +467,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
           provider.updateInstructions(updatedInstructions)
         } else {
-          // Nova path — intentionally no delivery. injectSystemText is an
-          // interactive USER turn on the relay, so a push here makes Nova
-          // start a new response mid-answer (see the doc comment above).
-          // The steer still feeds the clinician panel and the eval worker.
-          return
+          // Nova path — park the hint for the next get_attending_hint call
+          // (see the doc comment above). Never injectSystemText here: that is
+          // an interactive USER turn and Nova would answer it mid-answer.
+          const hint = buildNovaHint(pushPayload)
+          if (hint) pendingNovaHintRef.current = hint
         }
       } catch (err) {
         console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
@@ -540,7 +543,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       const pushPayload = data.push_payload
       if (shouldPushLocalizer({
-        speaking: isAiSpeakingRef.current,
+        // Mid-speech matters only for the OpenAI instructions rewrite; a Nova
+        // hint is merely parked, so arming it while Henry talks loses nothing.
+        speaking: providerRef.current?.updateInstructions ? isAiSpeakingRef.current : false,
         safetyEscalated: safetyEscalatedRef.current,
         payloadEmpty: !pushPayload || !(
           pushPayload.top_differentials?.some(value => value.trim()) ||
@@ -671,6 +676,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const handleToolCall = useCallback((toolName: string, toolUseId: string, input: unknown) => {
     const provider = providerRef.current
     const args: any = (input && typeof input === 'object') ? input : {}
+
+    // ── get_attending_hint (Nova only): the localizer steer as a PULL ──
+    // Serve once — a hint must not repeat on every later turn; null tells
+    // Henry to continue with his own plan (src/lib/historian/novaSteer.ts).
+    if (toolName === ATTENDING_HINT_TOOL_NAME) {
+      const hint = pendingNovaHintRef.current
+      pendingNovaHintRef.current = null
+      provider?.sendToolResult(toolUseId, { hint })
+      return
+    }
 
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
@@ -1083,6 +1098,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     localizerAbortRef.current = null
     detailInFlightRef.current = null
     localizerDataRef.current = null
+    pendingNovaHintRef.current = null
     setLocalizerData(null)
     transcriptRef.current = []
     questionCountRef.current = 0
@@ -1101,6 +1117,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     finalizingRef.current = false
     precloseRejectedRef.current = false
     localizerCycleRef.current = 0
+    pendingNovaHintRef.current = null
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
     flushTokenRef.current = null
@@ -1125,6 +1142,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           patientContext: options.patientContext,
           provider: options.provider,
           referral: options.referral,
+          // Nova: offer get_attending_hint + its workflow only when this
+          // session will actually run the localizer (mirrors localizerEnabled).
+          steer: options.enableLocalizer !== false,
         }),
       })
 

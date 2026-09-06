@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { shouldPushLocalizer } from '@/lib/historian/precloseGate'
+import { buildNovaHint } from '@/lib/historian/novaSteer'
 
 const hook = readFileSync('src/hooks/useRealtimeSession.ts', 'utf8')
 const pushSource = hook.slice(hook.indexOf('  const pushLocalizerContext ='), hook.indexOf('  // ── Localizer: fire async'))
@@ -16,14 +17,14 @@ function harness(openai = false, options: { localizerDetail?: boolean; onLocaliz
   const refs = {
     providerRef: { current: provider }, baseInstructionsRef: { current: 'BASE' },
     isAiSpeakingRef: { current: false }, safetyEscalatedRef: { current: false },
-    localizerCycleRef: { current: 0 },
+    localizerCycleRef: { current: 0 }, pendingNovaHintRef: { current: null as string | null },
     localizerInFlightRef: { current: false }, localizerResultCycleRef: { current: 0 },
     localizerAbortRef: { current: null }, detailInFlightRef: { current: null },
     localizerDataRef: { current: null }, finalizingRef: { current: false }, sessionGenRef: { current: 1 },
     transcriptRef: { current: [{ role: 'user', text: 'old'.repeat(30000) }, { role: 'assistant', text: 'newest' }] },
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
-  const env = { ...refs, fetch, options, shouldPushLocalizer, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
+  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
   const source = `${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
@@ -46,7 +47,7 @@ describe('attending client hook wiring', () => {
     expect(h.boundLocalizerTranscript([{ role: 'user', text: 'small' }])).toEqual([{ role: 'user', text: 'small' }])
   })
 
-  it('pushes once per cycle on OpenAI and never hands Nova a user turn', async () => {
+  it('pushes once per cycle on OpenAI and parks a hint for Nova instead of a user turn', async () => {
     for (const openai of [false, true]) {
       const h = harness(openai)
       for (let i = 0; i < 15; i++) await h.runLocalizer()
@@ -55,26 +56,40 @@ describe('attending client hook wiring', () => {
       if ('updateInstructions' in h.provider) {
         expect(h.provider.updateInstructions).toHaveBeenCalledTimes(15)
         expect(h.provider.injectSystemText).not.toHaveBeenCalled()
-      } else expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+      } else {
+        expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+        expect(h.pendingNovaHintRef.current).toBe('First?')
+      }
     }
     expect(runSource.match(/pushLocalizerContext\(pushPayload\)/g)).toHaveLength(1)
   })
 
-  it('keeps the speaking guard and resets counters beside the preclose reset', async () => {
+  it('keeps the OpenAI speaking guard, arms Nova even mid-speech, and resets counters beside the preclose reset', async () => {
+    const openai = harness(true)
+    openai.isAiSpeakingRef.current = true
+    await openai.runLocalizer()
+    expect(openai.provider.updateInstructions).not.toHaveBeenCalled()
     const h = harness()
     h.isAiSpeakingRef.current = true
     await h.runLocalizer()
     expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
     const start = hook.slice(hook.indexOf('const startSession ='))
     expect(start).toContain('precloseRejectedRef.current = false\n    localizerCycleRef.current = 0')
     expect(readFileSync('src/components/consult/EmbeddedHistorian.tsx', 'utf8')).not.toMatch(/pushLocalizerContext(?:Ref)?/)
   })
 
-  it('never delivers the localizer steer to Nova as an interactive user turn', () => {
+  it('never delivers the localizer steer to Nova as an interactive user turn — it parks the attending gap, then the suggested question', () => {
     const h = harness()
     h.pushLocalizerContext({ top_differentials: ['x'], suggested_next_question: 'y?', suggested_scale_id: 'z', attending_gaps: ['First?'] })
     expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    h.pushLocalizerContext({ suggested_next_question: '  Suggested?  ' })
+    expect(h.pendingNovaHintRef.current).toBe('Suggested?')
+    h.pushLocalizerContext({ top_differentials: ['only names'] })
+    expect(h.pendingNovaHintRef.current).toBe('Suggested?') // no question → keep the unserved one
     expect(pushSource).not.toMatch(/\.injectSystemText\(/)
+    expect(pushSource).not.toMatch(/\.injectContext\(/)
   })
 
   it('adds exactly the first gap line to the OpenAI delta and preserves legacy bytes when absent or empty', () => {

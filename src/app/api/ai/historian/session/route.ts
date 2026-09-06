@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition, getHistorianToolsForProvider } from '@/lib/historianPrompts'
+import { withNovaSteerWorkflow } from '@/lib/historian/novaSteer'
 import type { HistorianSessionType } from '@/lib/historianTypes'
 import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
@@ -200,11 +201,17 @@ export async function POST(request: Request) {
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
     if (provider === 'nova') {
-      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
+      // `steer` = the client will run the localizer for this session. On Nova
+      // its hint reaches Henry as a PULL: the get_attending_hint tool plus the
+      // workflow paragraph (src/lib/historian/novaSteer.ts). Without it Henry
+      // keeps the plain prompt — no tool is offered, nothing to call.
+      const steer = body.steer === true
+      const basePrompt = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
+      const instructions = steer ? withNovaSteerWorkflow(basePrompt) : basePrompt
       return NextResponse.json({
         provider: 'nova',
         instructions,
-        tools: getHistorianToolsForProvider('nova'),
+        tools: getHistorianToolsForProvider('nova', undefined, { attendingHint: steer }),
         relayUrl: process.env.NOVA_SONIC_RELAY_URL,
         voiceId: process.env.NOVA_SONIC_VOICE_ID,
         // Short-lived relay auth token (see mintNovaRelayToken above).

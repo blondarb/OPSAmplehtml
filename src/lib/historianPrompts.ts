@@ -14,6 +14,7 @@ import type {
   ReferralClarificationQuestion,
 } from './historianTypes'
 import { getInterviewBudget } from './historianTypes'
+import { ATTENDING_HINT_TOOL } from '@/lib/historian/novaSteer'
 
 const CORE_PROMPT = `You are Henry, a warm and deeply caring AI medical historian at Sevaro Health. Your full name is Henry the Historian. You conduct neurological intake interviews with patients before they see their neurologist.
 
@@ -521,7 +522,12 @@ export function toNovaToolSpec(openAiTool: { name: string; description?: string;
 export function getHistorianToolsForProvider(
   provider: 'nova' | 'openai',
   sessionType?: HistorianSessionType,
+  opts: { attendingHint?: boolean } = {},
 ) {
   const tools = getHistorianToolDefinition(sessionType)
-  return provider === 'openai' ? tools : tools.map((tool) => toNovaToolSpec(tool))
+  if (provider === 'openai') return tools
+  // Nova only: the localizer steer is a PULL through get_attending_hint (see
+  // src/lib/historian/novaSteer.ts). OpenAI keeps its instructions rewrite.
+  const novaTools = tools.map((tool) => toNovaToolSpec(tool))
+  return opts.attendingHint ? [...novaTools, toNovaToolSpec(ATTENDING_HINT_TOOL)] : novaTools
 }

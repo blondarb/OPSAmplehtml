@@ -117,7 +117,14 @@ export interface VoiceProvider {
   on(cb: (e: VoiceEvent) => void): void
   /** Return a tool result for a prior `toolCall` (the hook executes the tool). */
   sendToolResult(toolUseId: string, output: unknown): void
-  /** Inject advisory system text mid-session (localizer / scale guidance). */
+  /**
+   * Inject advisory text mid-session as a TURN the model answers (scale
+   * guidance, pre-close note, unresponsive check-in, closing nudge). On Nova
+   * this is an interactive USER text block — a fake patient utterance — so it
+   * must never carry the localizer steer: that reaches Nova as a tool result
+   * (get_attending_hint, src/lib/historian/novaSteer.ts) and OpenAI via
+   * updateInstructions.
+   */
   injectSystemText(text: string): void
   /**
    * Force the model to produce a response now (e.g. to kick off scale
