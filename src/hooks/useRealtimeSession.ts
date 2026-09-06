@@ -583,7 +583,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               followUpQuestions: detail.followUpQuestions,
               localizationHypothesis: detail.localizationHypothesis,
               suggestedActions: detail.suggestedActions, confidence: detail.confidence,
-              partial: detail.partial, degradedReason: detail.degradedReason, processingMs: detail.processingMs,
+              // A clean detail must never clear a warning the steer itself raised (attending failed, plan
+              // evidence unavailable, timeout) — the panel's 'Partial analysis' banner stays until a clean steer.
+              partial: localizerDataRef.current.partial || detail.partial,
+              degradedReason: localizerDataRef.current.degradedReason ?? detail.degradedReason,
+              processingMs: detail.processingMs,
             }
             localizerDataRef.current = merged
             setLocalizerData(merged)

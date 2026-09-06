@@ -136,6 +136,15 @@ it('pushes before unresolved detail, then merges only clinician fields with a se
   expect(h.detailInFlightRef.current).toBeNull()
 })
 
+it('keeps the steer\'s own partial warning when a clean detail merges', async () => {
+  const h = harness(false, { localizerDetail: true })
+  const partialSteer = { ...steerResponse, partial: true, degradedReason: 'Attending review failed' }
+  h.fetch.mockResolvedValueOnce(response(partialSteer)).mockResolvedValueOnce(response({ ...detailResponse, partial: false, degradedReason: null }))
+  await h.runLocalizer()
+  await flushDetail()
+  expect(h.localizerDataRef.current).toMatchObject({ differential: detailResponse.differential, partial: true, degradedReason: 'Attending review failed' })
+})
+
 it('defaults to steer only even when transport inputs are returned', async () => {
   const h = harness()
   h.fetch.mockResolvedValue(response(steerResponse))
