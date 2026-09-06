@@ -475,8 +475,7 @@ export async function generateFinalDifferential(
 
 // Persisted lifecycle records. Keep the existing insufficient-transcript stub intact.
 export type FinalDifferentialOk = FinalDifferential
-export interface FinalDifferentialPending {
-  status: 'pending' | 'queued'
+export type FinalDifferentialPending = ({ status: 'pending' } | { status: 'queued' }) & {
   queued_at: string
   source?: 'save'
 }
@@ -521,7 +520,8 @@ export async function persistFinalDifferentialRecord(sessionId: string, record: 
   try {
     const { getPool } = await import('@/lib/db')
     const pool = await getPool()
-    await pool.query('UPDATE historian_sessions SET final_differential = $1 WHERE id = $2', [JSON.stringify(record), sessionId])
+    const errorGuard = record.status === 'error' ? " AND (final_differential->>'status' IS DISTINCT FROM 'ok')" : ''
+    await pool.query('UPDATE historian_sessions SET final_differential = $1 WHERE id = $2' + errorGuard, [JSON.stringify(record), sessionId])
     return true
   } catch (error) {
     if ((error as { code?: string })?.code === '42703') {
@@ -542,7 +542,7 @@ export async function runFinalDifferential(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; persistErrorRecord?: boolean } = {},
 ): Promise<FinalDifferentialExecution> {
   let record: FinalDifferentialRecord
   let error: unknown
@@ -553,6 +553,7 @@ export async function runFinalDifferential(
     error = err
     record = createFinalDifferentialError(err)
     console.error('[historian/eval] final differential generation failed', record.error_class)
+    if (!opts.persistErrorRecord) return { record, error }
   }
   try {
     await persistFinalDifferentialRecord(sessionId, record)
@@ -561,7 +562,7 @@ export async function runFinalDifferential(
     record = createFinalDifferentialError(err)
     console.error('[historian/eval] final differential persistence failed', record.error_class)
     // A failed success UPDATE may still allow an explicit error marker.
-    try { await persistFinalDifferentialRecord(sessionId, record) } catch { /* worker retries transient DB failures */ }
+    try { if (opts.persistErrorRecord) await persistFinalDifferentialRecord(sessionId, record) } catch { /* worker retries transient DB failures */ }
   }
   return { record, error }
 }

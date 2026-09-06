@@ -15,8 +15,9 @@ export interface HistorianEvalSession {
   final_differential?: FinalDifferentialRecord | null
 }
 export interface HistorianEvalWorkerDependencies {
+  query: (sql: string, values: unknown[]) => Promise<{ rows: unknown[] }>
   loadSession: (id: string) => Promise<HistorianEvalSession | null>
-  runFinalDifferential: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: { signal?: AbortSignal }) => Promise<FinalDifferentialExecution | void>
+  runFinalDifferential: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: { signal?: AbortSignal; persistErrorRecord?: boolean }) => Promise<FinalDifferentialExecution | void>
   runThoroughnessJudge: (id: string, transcript: HistorianTranscriptEntry[], opts: ThoroughnessJudgeOptions) => Promise<unknown>
   runIndependentDdxAndAgreement: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: { signal?: AbortSignal }) => Promise<unknown>
   persistError: (id: string, error: FinalDifferentialError) => Promise<unknown>
@@ -73,16 +74,15 @@ export async function processHistorianEvalSqsEvent(event: SQSEvent, deps: Histor
       if (!session) { deps.log('historian_eval_session_missing'); continue }
       const transcript = Array.isArray(session.transcript) ? session.transcript : []
       const complaint = session.structured_output?.chief_complaint || session.referral_reason || undefined
-      if (session.final_differential?.status !== 'ok') {
+      if (!['ok', 'insufficient_transcript'].includes(session.final_differential?.status ?? '')) {
         try {
           const outcome = await bounded(Math.min(300_000, remaining()), (signal) =>
-            deps.runFinalDifferential(sessionId!, transcript, complaint, { signal }))
+            deps.runFinalDifferential(sessionId!, transcript, complaint, { signal, persistErrorRecord: true }))
           if (outcome?.error) throw outcome.error
           const updated = await load()
-          if (updated?.final_differential?.status !== 'ok') {
+          if (!['ok', 'insufficient_transcript'].includes(updated?.final_differential?.status ?? '')) {
             const current = updated?.final_differential ?? outcome?.record
-            const error = current?.status === 'error' ? current : createFinalDifferentialError(
-              current?.status === 'insufficient_transcript' ? { name: 'InsufficientTranscriptError' } : undefined)
+            const error = current?.status === 'error' ? current : createFinalDifferentialError(undefined)
             await persist(error)
             deps.log('historian_eval_differential_failed', error.error_class)
           }
@@ -102,7 +102,14 @@ export async function processHistorianEvalSqsEvent(event: SQSEvent, deps: Histor
         })],
         ['independent_agreement', (signal: AbortSignal) => deps.runIndependentDdxAndAgreement(sessionId!, transcript, complaint, { signal })],
       ] as const) {
-        try { await bounded(Math.min(240_000, remaining()), operation) }
+        try {
+          const evaluator = name === 'thoroughness' ? 'thoroughness' : 'agreement'
+          const existing = await bounded(Math.min(10_000, remaining()), () => deps.query(
+            'SELECT id FROM historian_evaluations WHERE session_id = $1 AND evaluator = $2 LIMIT 1',
+            [sessionId!, evaluator],
+          ))
+          if (existing.rows.length === 0) await bounded(Math.min(240_000, remaining()), operation)
+        }
         catch (error) { deps.log(`historian_eval_${name}_failed`, classifyFinalDifferentialError(error).errorClass) }
       }
     } catch (error) {

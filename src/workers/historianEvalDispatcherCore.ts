@@ -6,7 +6,9 @@ export interface HistorianEvalDispatcherDependencies {
 
 export async function dispatchHistorianEvaluations(deps: HistorianEvalDispatcherDependencies) {
   const { rows } = await deps.query(`SELECT id FROM historian_sessions
-    WHERE final_differential->>'status' = 'pending'
+    WHERE (final_differential->>'status' = 'pending'
+      OR (final_differential->>'status' = 'queued'
+        AND (final_differential->>'queued_at')::timestamptz < now() - interval '60 minutes'))
       AND created_at > now() - interval '48 hours'
     ORDER BY created_at LIMIT 20`)
   let enqueued = 0
@@ -29,7 +31,9 @@ export async function dispatchHistorianEvaluations(deps: HistorianEvalDispatcher
       // The worker can finish before SendMessageBatch returns: never replace its result.
       await deps.query(`UPDATE historian_sessions
         SET final_differential = final_differential || $1::jsonb
-        WHERE id = $2 AND final_differential->>'status' = 'pending'`, [
+        WHERE id = $2 AND (final_differential->>'status' = 'pending'
+      OR (final_differential->>'status' = 'queued'
+        AND (final_differential->>'queued_at')::timestamptz < now() - interval '60 minutes'))`, [
         JSON.stringify({ status: 'queued', queued_at: enqueuedAt }), batch[i].id,
       ])
       enqueued++

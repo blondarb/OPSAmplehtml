@@ -107,7 +107,7 @@ export interface HistorianSession {
    * pending state in that case. Optional so rows saved before migration
    * 057 keep validating cleanly (same pattern as interview_completion_status).
    */
-  final_differential?: import('./historian/eval/finalDifferential').FinalDifferential | null
+  final_differential?: import('./historian/eval/finalDifferential').FinalDifferentialRecord | null
   /**
    * Historian Validation Suite Task 4: DeepSeek-R1's independent
    * differential (historian_evaluations, evaluator='independent_ddx') —

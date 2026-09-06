@@ -97,15 +97,38 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - Amplify SSR has a ~28–30 s request ceiling and freezes after response; awaiting or fire-and-forget cannot reliably finish this chain.
 - Queue mode awaits one pending DB marker; the minute dispatcher sends only `{ sessionId, enqueuedAt }` to SQS.
 - The worker loads the transcript from RDS, then runs differential → thoroughness → independent/agreement with 300/240/240 s budgets.
-- The existing insufficient-transcript generator stub is preserved; the worker records it as an explicit `error/insufficient` outcome.
-- HUMAN: from `infrastructure/triage-worker`, run `sam build && sam deploy`, review the change set, and confirm both new functions and queue.
-- HUMAN: then set Amplify `HISTORIAN_EVAL_MODE=queue` and redeploy; `next.config.ts` forwards this build-time env value into SSR.
-- Default is unset (inline chain); the existing `HISTORIAN_EVAL_AUTORUN=false` override still disables automatic evaluation.
-- Verify a synthetic save with `final_differential->>'status'`: pending → queued → ok/error within ~3 minutes at measured latency; queued may be too brief to observe.
+- The existing insufficient-transcript generator stub is preserved; the worker preserves `insufficient_transcript` as a terminal non-error result with `model_id: none` and does not regenerate it on redelivery.
+- HUMAN: from `infrastructure/triage-worker`, run `sam build && sam deploy`, review and confirm the change set using the deploy checklist in the infrastructure README.
+- HUMAN: verify migrations 057, 058, and 062 (the pending index; 061 was already taken) are applied before the flip. Then set Amplify `HISTORIAN_EVAL_MODE=queue` and REBUILD the app: `next.config.ts` env is build-time, so changing the environment without an Amplify rebuild does not activate queue mode.
+- Default is unset (inline chain, with generation failures logged and no error marker written); the existing `HISTORIAN_EVAL_AUTORUN=false` override still disables automatic evaluation.
+- Verify a synthetic save with `final_differential->>'status'`: pending → queued → ok/insufficient_transcript/error within ~3 minutes at measured latency; queued may be too brief to observe.
 - That is an observation target, not an SLA: queue backlog/retries can take longer; inspect error classes and the DLQ after three transient failures.
 - Rollback: unset the Amplify env var and redeploy to restore the inline chain; already queued work still completes.
 - Missing column (42703) or unavailable RDS can prevent any marker from being stored; logged persistence failure is not a successful evaluation.
-- Deferred Findings: legacy evaluator log sanitization, other consumers' lifecycle typing/display, and dedicated queue alarms/recovery beyond this contract remain follow-ups.
+- Deferred: per-evaluator failure markers and a retry contract for thoroughness/independent DDx (transient failures there remain silent); expansion beyond the 48-hour dispatcher window; VPC/networking for non-sandbox. Legacy evaluator log sanitization remains a follow-up. Lifecycle typing/display and queue alarms are handled in this PR.
+
+- The dispatcher schedule starts every minute from SAM deployment, regardless of the Amplify flag. Unsetting the flag prevents new save-route pending markers but does not stop dispatched work or the schedule.
+- Both selection and queued marking reclaim `queued` rows whose `queued_at` is older than 60 minutes (more than three 960-second visibility windows), within the existing 48-hour created-at window.
+- Redelivery skips terminal differential results and existing thoroughness/agreement rows. These query-before-run guards avoid completed-stage replay on sequential redelivery; they are not a cross-delivery lock. Per-evaluator retries and stronger concurrent dedup remain outside this contract.
+
+Human recovery after inspecting the DLQ and resolving the underlying failure (do not run automatically): inspect status counts first, then bind `$1` to the intended synthetic/governed session ID in an approved SQL client. The guarded update leaves successful and insufficient-transcript results intact. Recent pending/queued rows recover through the dispatcher; older-than-48-hour rows need a separately approved replay because resetting the marker does not widen that window.
+
+```sql
+SELECT final_differential->>'status' AS status, count(*)
+FROM historian_sessions
+WHERE final_differential->>'status' IN ('pending', 'queued', 'error')
+GROUP BY 1;
+
+UPDATE historian_sessions
+SET final_differential = jsonb_build_object(
+  'status', 'pending', 'queued_at', now(), 'source', 'manual_recovery')
+WHERE id = $1
+  AND created_at > now() - interval '48 hours'
+  AND (final_differential->>'status' = 'error'
+    OR (final_differential->>'status' IN ('pending', 'queued')
+      AND (final_differential->>'queued_at')::timestamptz < now() - interval '60 minutes'));
+```
+
 ## Pre-close coverage beta (2026-09-05)
 - `NEXT_PUBLIC_HISTORIAN_PRECLOSE_GATE` defaults OFF; literal `true` at build time enables the beta.
 - Before the first save, a deterministic server check finds up to three missing topics, critical rubric gaps first.

@@ -23,3 +23,9 @@ describe('runs differential lifecycle display', () => {
     expect(resolveDifferentials(value)[0].excluded).toEqual(value.localizer_excluded)
   })
 })
+
+it('shows insufficient transcript as terminal non-error', () => {
+  const insufficient = run({ status: 'insufficient_transcript', differential: [], provenance: { model_id: 'none' } })
+  expect(resolveEvaluationStatus(insufficient)).toBe('Post-interview analysis unavailable (insufficient transcript)')
+  expect(resolveDifferentials(insufficient)).toEqual([])
+})

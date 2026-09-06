@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
-import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { FinalDifferentialRecord } from '@/lib/historian/eval/finalDifferential'
 import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
 import type { AgreementResult } from '@/lib/historian/eval/agreement'
 import type { ThoroughnessEvaluation } from '@/lib/historian/eval/thoroughnessJudge'
@@ -38,7 +38,7 @@ interface HistorianReportViewProps {
    * poll for it, since the async evaluator typically hasn't finished by
    * the moment this "Interview Complete" screen first renders).
    */
-  finalDifferential?: FinalDifferential | null
+  finalDifferential?: FinalDifferentialRecord | null
   /**
    * Historian Validation Suite Task 4 — the independent DeepSeek-R1
    * differential and its agreement metrics against finalDifferential above.
@@ -290,7 +290,7 @@ interface PhysicianReportTabProps {
   narrativeSummary: string | null
   redFlags: HistorianRedFlag[]
   transcript?: HistorianTranscriptEntry[]
-  finalDifferential?: FinalDifferential | null
+  finalDifferential?: FinalDifferentialRecord | null
   independentDdx?: IndependentDifferential | null
   agreement?: AgreementResult | null
 }

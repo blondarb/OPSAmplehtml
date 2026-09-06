@@ -7,6 +7,7 @@ const event = { Records: [{ messageId: 'message-1', body: JSON.stringify({ sessi
 function setup() {
   const session: HistorianEvalSession = { id, transcript: [], referral_reason: 'Synthetic referral', narrative_summary: 'Synthetic summary', final_differential: { status: 'queued', queued_at: '2026-09-05T20:00:00Z' } }
   return {
+    query: vi.fn().mockResolvedValue({ rows: [] }),
     loadSession: vi.fn().mockResolvedValue({ ...session, final_differential: { status: 'ok' } }).mockResolvedValueOnce(session),
     runFinalDifferential: vi.fn().mockResolvedValue(undefined),
     runThoroughnessJudge: vi.fn().mockResolvedValue(undefined),
@@ -27,7 +28,7 @@ describe('historian evaluation worker', () => {
     const deps = setup()
     expect(await processHistorianEvalSqsEvent(event, deps)).toEqual({ batchItemFailures: [] })
     expect(deps.loadSession).toHaveBeenCalledTimes(2)
-    expect(deps.runFinalDifferential).toHaveBeenCalledWith(id, [], 'Synthetic referral', { signal: expect.any(AbortSignal) })
+    expect(deps.runFinalDifferential).toHaveBeenCalledWith(id, [], 'Synthetic referral', { signal: expect.any(AbortSignal), persistErrorRecord: true })
     expect(deps.runThoroughnessJudge).toHaveBeenCalledWith(id, [], expect.objectContaining({ reports: { narrative_summary: 'Synthetic summary' }, signal: expect.any(AbortSignal) }))
     expect(deps.runFinalDifferential.mock.invocationCallOrder[0]).toBeLessThan(deps.runThoroughnessJudge.mock.invocationCallOrder[0])
     expect(deps.runThoroughnessJudge.mock.invocationCallOrder[0]).toBeLessThan(deps.runIndependentDdxAndAgreement.mock.invocationCallOrder[0])
@@ -107,5 +108,39 @@ describe('historian evaluation worker', () => {
   it('classifies connection and model failures without retaining exception text', () => {
     expect(classifyFinalDifferentialError({ code: '08006' })).toEqual({ errorClass: 'db', transient: true })
     expect(classifyFinalDifferentialError({ name: 'ClinicalModelOutputError' })).toEqual({ errorClass: 'parse', transient: false })
+  })
+})
+
+describe('terminal records and evaluator redelivery guards', () => {
+  it.each([true, false])('preserves insufficient transcript (already stored: %s)', async (alreadyStored) => {
+    const deps = setup()
+    const insufficient = { status: 'insufficient_transcript', differential: [], provenance: { model_id: 'none' } }
+    const session = { id, transcript: [], final_differential: insufficient }
+    deps.loadSession.mockReset().mockResolvedValue(session)
+    if (!alreadyStored) deps.loadSession.mockResolvedValueOnce({ ...session, final_differential: { status: 'queued' } })
+    deps.runFinalDifferential.mockResolvedValue({ record: insufficient })
+    expect(await processHistorianEvalSqsEvent(event, deps)).toEqual({ batchItemFailures: [] })
+    expect(deps.runFinalDifferential).toHaveBeenCalledTimes(alreadyStored ? 0 : 1)
+    expect(deps.persistError).not.toHaveBeenCalled()
+    expect(insufficient.provenance.model_id).toBe('none')
+  })
+  it.each(['thoroughness', 'agreement', 'both'])('skips existing %s rows on differential retry', async (existing) => {
+    const deps = setup()
+    deps.runFinalDifferential.mockRejectedValue({ name: 'ThrottlingException' })
+    deps.query.mockImplementation(async (_sql, values) => ({ rows: existing === 'both' || values[1] === existing ? [{ id: 1 }] : [] }))
+    expect((await processHistorianEvalSqsEvent(event, deps)).batchItemFailures).toHaveLength(1)
+    expect(deps.query.mock.calls).toEqual([
+      ['SELECT id FROM historian_evaluations WHERE session_id = $1 AND evaluator = $2 LIMIT 1', [id, 'thoroughness']],
+      ['SELECT id FROM historian_evaluations WHERE session_id = $1 AND evaluator = $2 LIMIT 1', [id, 'agreement']],
+    ])
+    expect(deps.runThoroughnessJudge).toHaveBeenCalledTimes(existing === 'agreement' ? 1 : 0)
+    expect(deps.runIndependentDdxAndAgreement).toHaveBeenCalledTimes(existing === 'thoroughness' ? 1 : 0)
+  })
+  it('continues the independent check if the thoroughness lookup fails', async () => {
+    const deps = setup()
+    deps.query.mockRejectedValueOnce({ code: 'ECONNRESET' })
+    await processHistorianEvalSqsEvent(event, deps)
+    expect(deps.runThoroughnessJudge).not.toHaveBeenCalled()
+    expect(deps.runIndependentDdxAndAgreement).toHaveBeenCalledOnce()
   })
 })

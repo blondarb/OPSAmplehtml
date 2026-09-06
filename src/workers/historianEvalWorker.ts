@@ -13,6 +13,10 @@ export function createHistorianEvalWorkerHandler(deps: HistorianEvalWorkerDepend
 export async function handler(event: SQSEvent, context: Context): Promise<SQSBatchResponse> {
   context.callbackWaitsForEmptyEventLoop = false
   return createHistorianEvalWorkerHandler({
+    query: async (text, values) => {
+      const pool = await getPool()
+      return pool.query({ text, values, query_timeout: 10_000 } as QueryConfig & { query_timeout: number })
+    },
     loadSession: async (id) => {
       const pool = await getPool()
       const { rows } = await pool.query({

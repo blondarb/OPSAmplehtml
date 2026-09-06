@@ -96,3 +96,19 @@ permanent failures are acknowledged with an explicit error record where RDS is a
 Human deployment and Amplify flag/rollback steps are in
 [`HISTORIAN_VALIDATION_ROLLOUT.md`](../../docs/HISTORIAN_VALIDATION_ROLLOUT.md#off-request-evaluation-2026-09-05-human-deployment-required).
 The flag defaults to unset; neither a PR nor an Amplify deployment deploys this stack.
+
+
+### Historian deploy checklist (human execution only)
+
+1. Verify migrations 057/058 and 062 are applied to the intended database. Migration 062 uses `CONCURRENTLY` and must run outside a transaction; 061 was already allocated. Do not enable queue mode before these checks.
+2. Review regional reserved-concurrency capacity. Historian adds 3 reserved executions (worker 2, dispatcher 1) to the sibling functions' existing reservations; leave AWS's required unreserved pool available. Do not silently lower sibling reservations to make deployment fit.
+3. Validate and build, then review and explicitly confirm the change set:
+
+   ```bash
+   sam validate --lint
+   sam build && sam deploy --confirm-changeset
+   ```
+
+4. Expect new `HistorianEvalWorkerFunction` and `HistorianEvalDispatcherFunction`, their IAM roles, the SQS event-source mapping, minute Scheduler schedule and invoke role, `HistorianEvalWorkQueue`, `HistorianEvalDeadLetterQueue`, `HistorianEvalQueueTlsPolicy`, two retained 30-day log groups, and four alarms: `HistorianEvalDeadLetterAlarm`, `HistorianEvalQueueAgeAlarm` (1200 seconds), `HistorianEvalWorkerErrorAlarm`, and `HistorianEvalDispatcherErrorAlarm`. All alarm actions use the existing `TriageWorkerAlarmTopic`. Review generated resources and any unexpected sibling changes before confirmation.
+5. The dispatcher starts every minute as soon as SAM deploys, regardless of `HISTORIAN_EVAL_MODE`. It also reclaims queued rows older than 60 minutes within the 48-hour window. Confirm synthetic queue processing and log/alarm wiring, then set the Amplify flag and REBUILD: `next.config.ts` embeds the environment at build time.
+6. Follow the rollout document for synthetic acceptance, guarded stuck-row recovery, and rollback. Source checks and stack deployment alone do not establish installed/clinical acceptance. Non-sandbox VPC/networking remains deferred.

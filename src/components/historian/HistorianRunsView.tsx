@@ -93,6 +93,7 @@ export function resolveEvaluationStatus(run: RunRow): string | null {
   if (record?.status === 'error') {
     return `Post-interview analysis failed (${record.error_class}) at ${record.provenance.generated_at}`
   }
+  if (record?.status === 'insufficient_transcript') return 'Post-interview analysis unavailable (insufficient transcript)'
   return null
 }
 

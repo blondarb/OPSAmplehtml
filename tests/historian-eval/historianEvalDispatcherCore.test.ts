@@ -17,7 +17,7 @@ describe('historian evaluation dispatcher', () => {
     expect(deps.query.mock.calls[0][0]).toMatch(/ORDER BY created_at LIMIT 20/)
     expect(deps.query.mock.invocationCallOrder[0]).toBeLessThan(deps.sendMessages.mock.invocationCallOrder[0])
     expect(deps.sendMessages.mock.invocationCallOrder[0]).toBeLessThan(deps.query.mock.invocationCallOrder[1])
-    expect(deps.query.mock.calls[1][0]).toContain("WHERE id = $2 AND final_differential->>'status' = 'pending'")
+    expect(deps.query.mock.calls[1][0]).toContain("WHERE id = $2 AND (final_differential->>'status' = 'pending'")
     expect(JSON.parse(deps.query.mock.calls[1][1][0])).toEqual({ status: 'queued', queued_at: deps.now().toISOString() })
   })
   it('batches at ten and serializes only opaque sessionId and enqueuedAt', async () => {
@@ -46,4 +46,13 @@ describe('historian evaluation dispatcher', () => {
     await dispatchHistorianEvaluations(deps)
     expect(deps.sendMessages).not.toHaveBeenCalled()
   })
+})
+
+it('reclaims only queued records older than 60 minutes, in selection and marking', async () => {
+  const deps = setup()
+  await dispatchHistorianEvaluations(deps)
+  for (const [sql] of deps.query.mock.calls) {
+    expect(sql).toContain("OR (final_differential->>'status' = 'queued'")
+    expect(sql).toContain("AND (final_differential->>'queued_at')::timestamptz < now() - interval '60 minutes'))")
+  }
 })
