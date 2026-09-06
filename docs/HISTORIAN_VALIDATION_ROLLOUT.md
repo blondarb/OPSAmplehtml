@@ -129,6 +129,12 @@ WHERE id = $1
       AND (final_differential->>'queued_at')::timestamptz < now() - interval '60 minutes'));
 ```
 
+## Flags — attending review (server, A1)
+
+- `HISTORIAN_ATTENDING_ENABLED`: literal `true` enables, default off; `HISTORIAN_ATTENDING_INTERVAL`: positive integer, default/invalid fallback 2. Both are forwarded in `next.config.ts` for Amplify SSR. A2 supplies client consumption; this PR does not activate flags or change Amplify settings.
+- Clients without `localizerCycle` skip Step 4 with reason `no_cycle`; A2 supplies the cycle. Safety values `true`, `'true'`, `1`, and `'1'` skip review.
+- `AbortSignal.any` (Node 20.3+) is feature-detected; older runtimes use a manual route-abort/timeout combiner with timer and listener cleanup. Setup failures return empty gaps and preserve Step 3.
+
 ## Pre-close coverage beta (2026-09-05)
 - `NEXT_PUBLIC_HISTORIAN_PRECLOSE_GATE` defaults OFF; literal `true` at build time enables the beta.
 - Before the first save, a deterministic server check finds up to three missing topics, critical rubric gaps first.

@@ -99,6 +99,8 @@ const nextConfig: NextConfig = {
     BEDROCK_KB_ID: process.env.BEDROCK_KB_ID,
     COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
     // AI Historian turn-taking / noise handling (hot-revertable without a code change)
+    HISTORIAN_ATTENDING_ENABLED: process.env.HISTORIAN_ATTENDING_ENABLED,
+    HISTORIAN_ATTENDING_INTERVAL: process.env.HISTORIAN_ATTENDING_INTERVAL,
     HISTORIAN_TURN_DETECTION_MODE: process.env.HISTORIAN_TURN_DETECTION_MODE,
     HISTORIAN_NOISE_REDUCTION: process.env.HISTORIAN_NOISE_REDUCTION,
     // Interview depth budget "softMin-softMax:hardCap" (e.g. "45-60:70"). Controls

@@ -26,6 +26,9 @@ export interface LocalizerTranscriptTurn {
  * the historian session continues unaffected.
  */
 export interface LocalizerRequest {
+  fullTranscript?: Array<{ role: 'user' | 'assistant'; text: string }>
+  localizerCycle?: number
+  safetyEscalated?: boolean
   /** UUID of the active historian session (historian_sessions.id or ephemeral). */
   sessionId: string
   /** Session type influences the localizer prompt — new patients need diagnosis; follow-ups need treatment response. */
@@ -150,7 +153,25 @@ export interface GeneratedQuestions {
  * All fields are safe to partially populate — if any pipeline step fails,
  * the route returns whatever was successfully computed rather than an error.
  */
+export interface AttendingMeta {
+  ran: boolean
+  duration_ms?: number
+  dropped_turns?: number
+  reason?: 'disabled' | 'no_cycle' | 'safety' | 'interval' | 'too_short' | 'timeout' | 'error'
+}
+
+export interface LocalizerPushPayload {
+  top_differentials: string[]
+  suggested_next_question: string | null
+  suggested_scale_id: string | null
+  attending_gaps?: string[]
+  attending_meta?: AttendingMeta
+}
+
 export interface LocalizerResponse {
+  push_payload?: LocalizerPushPayload
+  attending_gaps?: string[]
+  attending_meta?: AttendingMeta
   /** 2–4 candidate diagnoses, ranked by likelihood. */
   differential: DifferentialEntry[]
   /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
