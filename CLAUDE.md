@@ -61,6 +61,7 @@ still see a "Vercel" status check on PRs, the integration is still connected.
 | `/consult` | Neuro Intake with AI Historian |
 | `/follow-up` | Patient Follow-Up Agent (SMS + voice) |
 | `/sdne` | SDNE XR assessment integration iframe |
+| `/launchpad` | Internal project index — every live/test/results link per project + open Asana items (`src/data/launchpad.json`) |
 
 ## Commands
 
