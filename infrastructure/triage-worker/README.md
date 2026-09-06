@@ -115,3 +115,5 @@ The flag defaults to unset; neither a PR nor an Amplify deployment deploys this 
 
 > 2026-09-06: the historian eval dispatcher schedule is named `HistorianEvalDispatcherFunctionPendingSweep` (event key `PendingSweep`). The earlier key `RecoverySweep` collided with the superseded `historian-mvp-qa-worker` stack, which owns `HistorianEvalDispatcherFunctionRecoverySweep`; that stack should be deleted separately.
 
+Rollout helper (Steve-executed, idempotent): `bash scripts/ops/historian-eval-rollout.sh` — deploys the stack, adds the four historian flags at the Amplify app level, rebuilds main, verifies. `DELETE_OLD_STACK=1` also removes the superseded `historian-mvp-qa-worker` stack.
+
