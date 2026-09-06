@@ -62,6 +62,173 @@ Globals:
       Environment: !Ref Environment
 
 Resources:
+  HistorianEvalDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-worker-dlq
+        - Key: Environment
+          Value: !Ref Environment
+
+  HistorianEvalWorkQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VisibilityTimeout: 960
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt HistorianEvalDeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-worker
+        - Key: Environment
+          Value: !Ref Environment
+
+  HistorianEvalQueueTlsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref HistorianEvalWorkQueue
+        - !Ref HistorianEvalDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
+        Statement:
+          - Sid: DenyInsecureTransportWork
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt HistorianEvalWorkQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt HistorianEvalDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  HistorianEvalWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/historianEvalWorker.handler
+      Description: Runs post-interview historian evaluations from opaque session identifiers.
+      Timeout: 900
+      MemorySize: 1024
+      ReservedConcurrentExecutions: 2
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: ConsumeOpaqueHistorianEvalWork
+              Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt HistorianEvalWorkQueue.Arn
+            - Sid: InvokePinnedClinicalModels
+              Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource:
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-5
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-5
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.deepseek.r1-v1:0
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/deepseek.r1-v1:0
+      Events:
+        WorkQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt HistorianEvalWorkQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: 2
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/historianEvalWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  HistorianEvalDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/historianEvalDispatcher.handler
+      Description: Dispatches pending historian evaluation session identifiers.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          HISTORIAN_EVAL_QUEUE_URL: !Ref HistorianEvalWorkQueue
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: SendOpaqueWorkIdentifiers
+              Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt HistorianEvalWorkQueue.Arn
+      Events:
+        RecoverySweep:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 3
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/historianEvalDispatcher.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
   LongPacketDeadLetterQueue:
     Type: AWS::SQS::Queue
     DeletionPolicy: Retain
@@ -600,6 +767,22 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${EmergencyAlertDeliveryDispatcherFunction}
       RetentionInDays: 30
 
+  HistorianEvalWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${HistorianEvalWorkerFunction}
+      RetentionInDays: 30
+
+  HistorianEvalDispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${HistorianEvalDispatcherFunction}
+      RetentionInDays: 30
+
   TriageWorkerAlarmTopic:
     Type: AWS::SNS::Topic
     DeletionPolicy: Retain
@@ -612,6 +795,75 @@ Resources:
           Value: sevaro-clinical
         - Key: Environment
           Value: !Ref Environment
+
+  HistorianEvalDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A historian evaluation message reached the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt HistorianEvalDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  HistorianEvalWorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Historian evaluation worker Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref HistorianEvalWorkerFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  HistorianEvalDispatcherErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Historian evaluation dispatcher Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref HistorianEvalDispatcherFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  HistorianEvalQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Historian evaluation work has waited more than 20 minutes.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt HistorianEvalWorkQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1200
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
 
   DeadLetterQueueVisibleAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -871,6 +1123,12 @@ Resources:
       AlarmActions: [!Ref TriageWorkerAlarmTopic]
 
 Outputs:
+  HistorianEvalQueueUrl:
+    Value: !Ref HistorianEvalWorkQueue
+  HistorianEvalWorkerFunctionName:
+    Value: !Ref HistorianEvalWorkerFunction
+  HistorianEvalDispatcherFunctionName:
+    Value: !Ref HistorianEvalDispatcherFunction
   WorkQueueUrl:
     Value: !Ref LongPacketWorkQueue
   WorkQueueArn:

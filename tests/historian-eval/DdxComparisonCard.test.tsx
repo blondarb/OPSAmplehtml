@@ -161,3 +161,14 @@ describe('DdxComparisonCard', () => {
     expect(markup).toContain('Turn 1')
   })
 })
+
+it.each(['pending', 'queued'] as const)('renders pipeline %s without result fields', (status) => {
+  const markup = renderToStaticMarkup(<DdxComparisonCard finalDifferential={{ status, queued_at: '2026-09-05T20:00:00Z' }} independentDdx={null} agreement={null} />)
+  expect(markup).toContain('Pipeline differential pending')
+})
+it('labels a pipeline error as failed without raw message text', () => {
+  const markup = renderToStaticMarkup(<DdxComparisonCard finalDifferential={{ status: 'error', error_class: 'parse', message: 'PRIVATE RAW MESSAGE', provenance: PIPELINE.provenance }} independentDdx={null} agreement={null} />)
+  expect(markup).toContain('Pipeline differential failed (parse)')
+  expect(markup).not.toContain('Pipeline differential pending')
+  expect(markup).not.toContain('PRIVATE RAW MESSAGE')
+})

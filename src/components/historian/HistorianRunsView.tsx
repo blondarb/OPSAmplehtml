@@ -35,7 +35,8 @@ interface ExcludedEntry {
   reason?: string
 }
 
-interface RunRow extends HistorianSession {
+interface RunRow extends Omit<HistorianSession, 'final_differential'> {
+  final_differential?: import('@/lib/historian/eval/finalDifferential').FinalDifferentialRecord | null
   consult_id?: string | null
   localizer_differential?: DifferentialEntry[]
   localizer_excluded?: ExcludedEntry[]
@@ -66,7 +67,7 @@ export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
     })
   }
   const final = run.final_differential
-  if (Array.isArray(final?.differential) && final.differential.length > 0) {
+  if (final && 'differential' in final && Array.isArray(final.differential) && final.differential.length > 0) {
     sources.push({
       entries: final.differential.map((item) => ({
         diagnosis: item.diagnosis,
@@ -82,6 +83,18 @@ export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
     })
   }
   return sources
+}
+
+export function resolveEvaluationStatus(run: RunRow): string | null {
+  const record = run.final_differential
+  if (record?.status === 'pending' || record?.status === 'queued') {
+    return `Post-interview analysis pending (since ${record.queued_at})`
+  }
+  if (record?.status === 'error') {
+    return `Post-interview analysis failed (${record.error_class}) at ${record.provenance.generated_at}`
+  }
+  if (record?.status === 'insufficient_transcript') return 'Post-interview analysis unavailable (insufficient transcript)'
+  return null
 }
 
 interface Metrics {
@@ -443,6 +456,12 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
               ))}
             </div>
           </Section>
+        )}
+
+        {resolveEvaluationStatus(run) && (
+          <div role="status" className="rounded-lg border border-slate-700 p-3 text-sm text-slate-300">
+            {resolveEvaluationStatus(run)}
+          </div>
         )}
 
         {differentials.map(({ entries: ddx, source, label, summary, excluded }) => (

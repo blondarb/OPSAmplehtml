@@ -22,6 +22,7 @@
  *      transcript turn it cites.
  */
 
+import { BEDROCK_MODEL } from '@/lib/bedrock'
 import { getNeuroPlansPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
@@ -359,7 +360,9 @@ export function sanitizeDifferential(
 export async function generateFinalDifferential(
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<FinalDifferential> {
+  opts.signal?.throwIfAborted()
   const serializedLength = serializedTranscriptLength(transcript)
   if (serializedLength > MAX_TRANSCRIPT_CHARS) {
     throw new TranscriptTooLargeError(serializedLength, MAX_TRANSCRIPT_CHARS)
@@ -389,6 +392,7 @@ export async function generateFinalDifferential(
   // latency isn't persisted anywhere yet — keeps both call sites on the
   // same invocation path rather than one raw and one wrapped.
   const { result: symptoms } = await invokeBedrockJSONWithMeta<ExtractedSymptoms>({
+    signal: opts.signal,
     system: SYMPTOM_EXTRACTOR_PROMPT,
     messages: [
       {
@@ -425,6 +429,7 @@ export async function generateFinalDifferential(
 
   // ── Step 3: ONE schema-forced final differential call ───────────────────
   const { result, modelId } = await invokeBedrockClinicalToolWithMeta<FinalDdxToolOutput>({
+    signal: opts.signal,
     system: FINAL_DDX_SYSTEM_PROMPT,
     messages: [
       {
@@ -444,6 +449,10 @@ export async function generateFinalDifferential(
     inputSchema: FINAL_DDX_INPUT_SCHEMA,
   })
 
+  opts.signal?.throwIfAborted()
+  if (!result || !Array.isArray(result.differential) || typeof result.summary !== 'string') {
+    throw new SyntaxError('Invalid differential output shape')
+  }
   const { items, droppedQuotes } = sanitizeDifferential(transcript, result.differential)
 
   return {
@@ -464,69 +473,96 @@ export async function generateFinalDifferential(
   }
 }
 
-// ── Fire-and-forget persistence wrapper (used by POST /save) ─────────────────
+// Persisted lifecycle records. Keep the existing insufficient-transcript stub intact.
+export type FinalDifferentialOk = FinalDifferential
+export type FinalDifferentialPending = ({ status: 'pending' } | { status: 'queued' }) & {
+  queued_at: string
+  source?: 'save'
+}
+export type FinalDifferentialErrorClass = 'timeout' | 'bedrock' | 'parse' | 'oversized' | 'insufficient' | 'db' | 'unknown'
+export interface FinalDifferentialError {
+  status: 'error'
+  error_class: FinalDifferentialErrorClass
+  message: string
+  provenance: Pick<EvalProvenance, 'model_id' | 'generated_at' | 'prompt_version'>
+}
+export type FinalDifferentialRecord = FinalDifferentialOk | FinalDifferentialPending | FinalDifferentialError
 
-/**
- * Generate + persist the final differential for one session, catching
- * everything. Intended to be called `void`-style (fire-and-forget) right
- * after POST /save's row insert — never throws, never awaited by the save
- * response.
- *
- * Persists via a raw UPDATE (not the from() query builder) so the JSONB
- * payload is pre-stringified explicitly at the call site, per the
- * db-query.ts array/object auto-stringify gotcha documented in save/route.ts.
- *
- * If historian_sessions.final_differential doesn't exist yet (migration 057
- * not applied — expected until the rollout task applies it), logs one quiet
- * informational line, not an error, mirroring the historian_transcript_events
- * 42P01 precedent from Task 1.
- */
+/** Classify only; never copy exception messages (which can contain model/source text). */
+export function classifyFinalDifferentialError(error: unknown): { errorClass: FinalDifferentialErrorClass; transient: boolean } {
+  const e = error as { name?: string; code?: string; message?: string; $metadata?: { httpStatusCode?: number } } | null
+  const name = e?.name ?? ''
+  const code = e?.code ?? ''
+  const status = e?.$metadata?.httpStatusCode ?? 0
+  if (name === 'AbortError' || name === 'TimeoutError') return { errorClass: 'timeout', transient: false }
+  if (name === 'TranscriptTooLargeError') return { errorClass: 'oversized', transient: false }
+  if (name === 'InsufficientTranscriptError') return { errorClass: 'insufficient', transient: false }
+  if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND', '57P01', '57P02', '57P03', '53300'].includes(code) || code.startsWith('08')) return { errorClass: 'db', transient: true }
+  if (e?.message === 'Query read timeout' || e?.message === 'Connection terminated unexpectedly') return { errorClass: 'db', transient: true }
+  if (/^[0-9A-Z]{5}$/.test(code)) return { errorClass: 'db', transient: false }
+  if (name === 'SyntaxError' || name === 'ClinicalModelOutputError') return { errorClass: 'parse', transient: false }
+  if (['ThrottlingException', 'TooManyRequestsException', 'ServiceUnavailableException', 'InternalServerException', 'ModelNotReadyException'].includes(name) || status === 429 || status >= 500) return { errorClass: 'bedrock', transient: true }
+  if (/Exception$/.test(name)) return { errorClass: 'bedrock', transient: false }
+  return { errorClass: 'unknown', transient: false }
+}
+
+export function createFinalDifferentialError(error: unknown, now = new Date()): FinalDifferentialError {
+  const { errorClass } = classifyFinalDifferentialError(error)
+  return {
+    status: 'error', error_class: errorClass,
+    message: `Post-interview differential failed: ${errorClass}.`,
+    provenance: { model_id: BEDROCK_MODEL, generated_at: now.toISOString(), prompt_version: FINAL_DDX_PROMPT_VERSION },
+  }
+}
+
+/** One UPDATE; missing-column rollout compatibility remains fail-open. */
+export async function persistFinalDifferentialRecord(sessionId: string, record: FinalDifferentialRecord): Promise<boolean> {
+  try {
+    const { getPool } = await import('@/lib/db')
+    const pool = await getPool()
+    const errorGuard = record.status === 'error' ? " AND (final_differential->>'status' IS DISTINCT FROM 'ok')" : ''
+    await pool.query('UPDATE historian_sessions SET final_differential = $1 WHERE id = $2' + errorGuard, [JSON.stringify(record), sessionId])
+    return true
+  } catch (error) {
+    if ((error as { code?: string })?.code === '42703') {
+      console.info('[historian/eval] evaluation column not available yet')
+      return false
+    }
+    throw error
+  }
+}
+
+export interface FinalDifferentialExecution {
+  record: FinalDifferentialRecord
+  error?: unknown
+}
+
+/** Inline callers remain fail-open; the worker also receives classified failure evidence. */
 export async function runFinalDifferential(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
-): Promise<void> {
-  let result: FinalDifferential
+  opts: { signal?: AbortSignal; persistErrorRecord?: boolean } = {},
+): Promise<FinalDifferentialExecution> {
+  let record: FinalDifferentialRecord
+  let error: unknown
   try {
-    result = await generateFinalDifferential(transcript, chiefComplaint)
+    record = await generateFinalDifferential(transcript, chiefComplaint, opts)
+    opts.signal?.throwIfAborted()
   } catch (err) {
-    if (err instanceof TranscriptTooLargeError) {
-      console.warn(
-        '[historian/eval] skipping final differential — transcript too large for session',
-        sessionId,
-      )
-    } else {
-      console.error(
-        '[historian/eval] final differential generation failed (non-fatal) for session',
-        sessionId,
-        err,
-      )
-    }
-    return
+    error = err
+    record = createFinalDifferentialError(err)
+    console.error('[historian/eval] final differential generation failed', record.error_class)
+    if (!opts.persistErrorRecord) return { record, error }
   }
-
   try {
-    const { getPool } = await import('@/lib/db')
-    const pool = await getPool()
-    await pool.query('UPDATE historian_sessions SET final_differential = $1 WHERE id = $2', [
-      JSON.stringify(result),
-      sessionId,
-    ])
-  } catch (err: unknown) {
-    const pgCode = (err as { code?: string } | undefined)?.code
-    if (pgCode === '42703') {
-      // final_differential column doesn't exist yet — expected and benign
-      // until the rollout task applies migration 057.
-      console.info(
-        '[historian/eval] historian_sessions.final_differential not present yet (migration 057 not applied) — skipping persist for session',
-        sessionId,
-      )
-    } else {
-      console.error(
-        '[historian/eval] failed to persist final differential (non-fatal) for session',
-        sessionId,
-        err,
-      )
-    }
+    await persistFinalDifferentialRecord(sessionId, record)
+  } catch (err) {
+    error = err
+    record = createFinalDifferentialError(err)
+    console.error('[historian/eval] final differential persistence failed', record.error_class)
+    // A failed success UPDATE may still allow an explicit error marker.
+    try { if (opts.persistErrorRecord) await persistFinalDifferentialRecord(sessionId, record) } catch { /* worker retries transient DB failures */ }
   }
+  return { record, error }
 }

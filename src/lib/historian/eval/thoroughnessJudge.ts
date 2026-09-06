@@ -126,6 +126,7 @@ export type ThoroughnessEvaluation = {
 }
 
 export interface ThoroughnessJudgeOptions {
+  signal?: AbortSignal
   chiefComplaint?: string
   /** Explicit syndrome override — takes priority over chiefComplaint-based detection. Falls back to base-only if unrecognized. */
   syndrome?: string
@@ -422,6 +423,7 @@ export async function generateThoroughnessEvaluationWithUsage(
 
   // ── Layer 2: one schema-forced Sonnet tool call ──────────────────────────
   const { result: raw, modelId, usage } = await invokeBedrockClinicalToolWithMeta<RawThoroughnessToolOutput>({
+    signal: options.signal,
     system: buildSystemPrompt(includeFidelity, verifySpecifically !== undefined),
     messages: [
       {

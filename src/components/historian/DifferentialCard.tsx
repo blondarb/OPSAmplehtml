@@ -1,7 +1,7 @@
 'use client'
 
 import { INVESTIGATIONAL_BANNER } from '@/lib/historian/eval/constants'
-import type { DifferentialItem, FinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { DifferentialItem, FinalDifferentialRecord } from '@/lib/historian/eval/finalDifferential'
 
 export interface DifferentialCardProps {
   /**
@@ -9,7 +9,7 @@ export interface DifferentialCardProps {
    * means the async post-session evaluator hasn't completed (or never ran)
    * for this session yet — rendered as a pending state, never an error.
    */
-  finalDifferential: FinalDifferential | null | undefined
+  finalDifferential: FinalDifferentialRecord | null | undefined
   /**
    * Called when a physician clicks a cited turn number, so the parent can
    * jump the Task-1 transcript viewer (HistorianTranscriptViewer) to that
@@ -176,6 +176,10 @@ export default function DifferentialCard({ finalDifferential, onQuoteClick }: Di
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
           Final differential pending — the post-session review pass has not completed yet.
         </p>
+      ) : finalDifferential.status === 'pending' || finalDifferential.status === 'queued' ? (
+        <p>Post-interview analysis pending{finalDifferential.queued_at ? ` (since ${formatGeneratedAt(finalDifferential.queued_at)})` : ''}.</p>
+      ) : finalDifferential.status === 'error' ? (
+        <p>Post-interview analysis failed ({finalDifferential.error_class}).</p>
       ) : finalDifferential.status === 'insufficient_transcript' ? (
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
           Insufficient transcript — differential not generated.

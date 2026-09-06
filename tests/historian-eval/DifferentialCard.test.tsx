@@ -103,3 +103,15 @@ describe('DifferentialCard', () => {
     expect(markup).not.toMatch(/pending/i)
   })
 })
+
+it.each(['pending', 'queued'] as const)('renders %s without differential fields', (status) => {
+  const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={{ status, queued_at: '2026-09-05T20:00:00Z' }} />)
+  expect(markup).toContain('Post-interview analysis pending')
+  expect(markup).toContain('since')
+})
+it('renders error class without raw message', () => {
+  const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={{ status: 'error', error_class: 'parse', message: 'PRIVATE RAW MESSAGE', provenance: SAMPLE.provenance }} />)
+  expect(markup).toContain('Post-interview analysis failed (parse)')
+  expect(markup).not.toContain('PRIVATE RAW MESSAGE')
+  expect(markup).not.toMatch(/pending/i)
+})
