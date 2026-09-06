@@ -72,14 +72,22 @@ interface NeurologicHistorianProps {
    * differential panel alongside the interview.
    *
    * MUST stay false on every /patient/* route — the redesign brief (Part 4)
-   * bars diagnostic content from the patient's screen, which is why
-   * enableLocalizer is hard-off below by default. Only a clinician-facing,
+   * bars diagnostic content from the patient's screen. This prop is the ONLY
+   * thing that renders the differential panel. Only a clinician-facing,
    * auth-gated route may pass this (see /consult/triage-historian). It is a
    * prop rather than a query param precisely so a patient cannot turn it on
    * by editing the URL.
+   *
+   * Separately, NEXT_PUBLIC_HISTORIAN_PATIENT_STEER (build-time, default off)
+   * lets the localizer RUN on patient routes so its private steer (localizer
+   * hints + attending-review gaps) reaches Henry. Nothing it produces is
+   * rendered to the patient; the panel below stays gated on clinicianMirror.
    */
   clinicianMirror?: boolean
 }
+
+// Build-time literal read (Next inlines NEXT_PUBLIC_* only when written exactly like this).
+const PATIENT_STEER_ENABLED = process.env.NEXT_PUBLIC_HISTORIAN_PATIENT_STEER === 'true'
 
 export default function NeurologicHistorian({ initialMode, clinicianMirror = false }: NeurologicHistorianProps = {}) {
   const searchParams = useSearchParams()
@@ -220,12 +228,12 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     // VOICE_PROVIDER decides — see useVoiceProviderPreference.
     provider: voiceProviderExplicit ? voiceProvider : undefined,
     referral: referralInput ?? undefined,
-    // Patient-facing surface: the localizer drives a physician-only panel and
-    // must not run here (redesign brief Part 4 — no diagnostic content on the
-    // patient page). The /consult clinician surface keeps its own localizer.
-    // `clinicianMirror` is the single, explicit opt-in for a clinician-facing
-    // route that wants the differential mirrored — never set on /patient/*.
-    enableLocalizer: clinicianMirror,
+    // Patient-facing surface: the differential PANEL is physician-only and is
+    // rendered solely under `clinicianMirror` (redesign brief Part 4 — no
+    // diagnostic content on the patient page). The localizer itself may run
+    // on patient routes when NEXT_PUBLIC_HISTORIAN_PATIENT_STEER is on: its
+    // output then goes only to Henry's private steer, never to the screen.
+    enableLocalizer: clinicianMirror || PATIENT_STEER_ENABLED,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
