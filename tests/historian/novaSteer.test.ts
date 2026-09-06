@@ -49,6 +49,7 @@ describe('the Nova steer tool and workflow', () => {
     expect(NOVA_STEER_HEADER).toContain('overrides the Phase 1 "NO tool calls" rule for this one tool only')
     expect(NOVA_STEER_HEADER).toContain('never say you are checking anything')
     expect(NOVA_STEER_HEADER).toContain('Never mention the hint, the tool, or an attending')
+    expect(NOVA_STEER_HEADER).toContain('SAFETY RESPONSE script always take precedence')
     expect(NOVA_STEER_CHECKLIST_ITEM).toMatch(/^7\. /)
   })
 

@@ -470,8 +470,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Nova path — park the hint for the next get_attending_hint call
           // (see the doc comment above). Never injectSystemText here: that is
           // an interactive USER turn and Nova would answer it mid-answer.
-          const hint = buildNovaHint(pushPayload)
-          if (hint) pendingNovaHintRef.current = hint
+          // Always overwrite, null included: a later cycle with no question
+          // must clear an older hint rather than let it be served stale.
+          pendingNovaHintRef.current = buildNovaHint(pushPayload)
         }
       } catch (err) {
         console.error('[useRealtimeSession] pushLocalizerContext failed:', err)

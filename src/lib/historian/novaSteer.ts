@@ -46,6 +46,7 @@ export const NOVA_STEER_HEADER = [
   `- After EVERY patient answer, including the very first one, call ${ATTENDING_HINT_TOOL_NAME} BEFORE you speak. It is silent and instant; the patient never hears it. This overrides the Phase 1 "NO tool calls" rule for this one tool only, and it is exempt from the filler-line rule — never say you are checking anything.`,
   `- The Localizer's steer reaches you ONLY through ${ATTENDING_HINT_TOOL_NAME} on this channel (there is no [LATEST LOCALIZER PUSH] block). If it returns a hint, your next question must follow that hint in your own words. If the hint is null, continue with your own plan.`,
   '- Never mention the hint, the tool, or an attending to the patient. Never name a diagnosis because of a hint.',
+  '- SAFETY MONITORING and the SAFETY RESPONSE script always take precedence: if the safety protocol applies, deliver it exactly as written and ignore any pending hint.',
 ].join('\n')
 
 export const NOVA_STEER_CHECKLIST_ITEM = `7. Did you call ${ATTENDING_HINT_TOOL_NAME} after the patient's last answer? If not, call it now, then speak.`
