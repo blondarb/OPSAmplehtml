@@ -2,28 +2,32 @@ import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { shouldPushLocalizer } from '@/lib/historian/precloseGate'
+import { buildNovaHint } from '@/lib/historian/novaSteer'
 
 const hook = readFileSync('src/hooks/useRealtimeSession.ts', 'utf8')
 const pushSource = hook.slice(hook.indexOf('  const pushLocalizerContext ='), hook.indexOf('  // ── Localizer: fire async'))
 const runSource = hook.slice(hook.indexOf('  const runLocalizer ='), hook.indexOf('  // ── Durable transcript flush (Task 1)'))
 const boundSource = hook.slice(hook.indexOf('function boundLocalizerTranscript'), hook.indexOf('type SessionStatus'))
+// The get_attending_hint branch of handleToolCall, executed against a real ref (not just string-pinned).
+const hintBranch = hook.slice(hook.indexOf('    if (toolName === ATTENDING_HINT_TOOL_NAME) {'), hook.indexOf('    // ── save_interview_output (existing) ──'))
 
 // Execute the actual hook callbacks with ref/provider doubles, without a live
 // microphone, React renderer, server, or paid model call.
 function harness(openai = false, options: { localizerDetail?: boolean; onLocalizerUpdate?: ReturnType<typeof vi.fn> } = {}) {
-  const provider = openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn() } : { injectSystemText: vi.fn() }
+  const provider: { updateInstructions?: ReturnType<typeof vi.fn>; injectSystemText: ReturnType<typeof vi.fn>; sendToolResult: ReturnType<typeof vi.fn> } =
+    openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn(), sendToolResult: vi.fn() } : { injectSystemText: vi.fn(), sendToolResult: vi.fn() }
   const refs = {
     providerRef: { current: provider }, baseInstructionsRef: { current: 'BASE' },
     isAiSpeakingRef: { current: false }, safetyEscalatedRef: { current: false },
-    localizerPushCountRef: { current: 0 }, localizerCycleRef: { current: 0 },
+    localizerCycleRef: { current: 0 }, pendingNovaHintRef: { current: null as string | null },
     localizerInFlightRef: { current: false }, localizerResultCycleRef: { current: 0 },
     localizerAbortRef: { current: null }, detailInFlightRef: { current: null },
     localizerDataRef: { current: null }, finalizingRef: { current: false }, sessionGenRef: { current: 1 },
     transcriptRef: { current: [{ role: 'user', text: 'old'.repeat(30000) }, { role: 'assistant', text: 'newest' }] },
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
-  const env = { ...refs, fetch, options, shouldPushLocalizer, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
-  const source = `const MAX_LOCALIZER_INJECTIONS = 12;\n${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
+  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, ATTENDING_HINT_TOOL_NAME: 'get_attending_hint', setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
+  const source = `${boundSource}\n${pushSource}\n${runSource}\nfunction serveTool(toolName, toolUseId) { const provider = providerRef.current\n${hintBranch}\nreturn 'fell-through' }\nreturn { serveTool, pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
   return { ...callbacks, ...env, provider }
@@ -45,7 +49,7 @@ describe('attending client hook wiring', () => {
     expect(h.boundLocalizerTranscript([{ role: 'user', text: 'small' }])).toEqual([{ role: 'user', text: 'small' }])
   })
 
-  it('pushes once per cycle, caps Nova at 12, and leaves OpenAI updates uncapped', async () => {
+  it('pushes once per cycle on OpenAI and parks a hint for Nova instead of a user turn', async () => {
     for (const openai of [false, true]) {
       const h = harness(openai)
       for (let i = 0; i < 15; i++) await h.runLocalizer()
@@ -54,31 +58,64 @@ describe('attending client hook wiring', () => {
       if ('updateInstructions' in h.provider) {
         expect(h.provider.updateInstructions).toHaveBeenCalledTimes(15)
         expect(h.provider.injectSystemText).not.toHaveBeenCalled()
-      } else expect(h.provider.injectSystemText).toHaveBeenCalledTimes(12)
+      } else {
+        expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+        expect(h.pendingNovaHintRef.current).toBe('First?')
+      }
     }
     expect(runSource.match(/pushLocalizerContext\(pushPayload\)/g)).toHaveLength(1)
   })
 
-  it('keeps the speaking guard and resets counters beside the preclose reset', async () => {
+  it('keeps the OpenAI speaking guard, arms Nova even mid-speech, and resets counters beside the preclose reset', async () => {
+    const openai = harness(true)
+    openai.isAiSpeakingRef.current = true
+    await openai.runLocalizer()
+    expect(openai.provider.updateInstructions).not.toHaveBeenCalled()
     const h = harness()
     h.isAiSpeakingRef.current = true
     await h.runLocalizer()
     expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
     const start = hook.slice(hook.indexOf('const startSession ='))
-    expect(start).toContain('precloseRejectedRef.current = false\n    localizerPushCountRef.current = 0\n    localizerCycleRef.current = 0')
+    expect(start).toContain('precloseRejectedRef.current = false\n    localizerCycleRef.current = 0')
     expect(readFileSync('src/components/consult/EmbeddedHistorian.tsx', 'utf8')).not.toMatch(/pushLocalizerContext(?:Ref)?/)
   })
 
-  it('adds exactly the first gap line in both deltas and preserves legacy bytes when absent or empty', () => {
-    for (const openai of [false, true]) {
+  it('never delivers the localizer steer to Nova as an interactive user turn — it parks the attending gap, then the suggested question', () => {
+    const h = harness()
+    h.pushLocalizerContext({ top_differentials: ['x'], suggested_next_question: 'y?', suggested_scale_id: 'z', attending_gaps: ['First?'] })
+    expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    h.pushLocalizerContext({ suggested_next_question: '  Suggested?  ' })
+    expect(h.pendingNovaHintRef.current).toBe('Suggested?')
+    h.pushLocalizerContext({ top_differentials: ['only names'] })
+    expect(h.pendingNovaHintRef.current).toBeNull() // a cycle with no question clears a stale hint
+    expect(pushSource).not.toMatch(/\.injectSystemText\(/)
+    expect(pushSource).not.toMatch(/\.injectContext\(/)
+  })
+
+  it('serves the parked hint exactly once through get_attending_hint, then null', async () => {
+    const h = harness()
+    await h.runLocalizer()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    expect(h.serveTool('save_interview_output', 'tu0')).toBe('fell-through')
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    expect(h.serveTool('get_attending_hint', 'tu1')).toBeUndefined()
+    expect(h.provider.sendToolResult).toHaveBeenLastCalledWith('tu1', { hint: 'First?' })
+    expect(h.pendingNovaHintRef.current).toBeNull()
+    h.serveTool('get_attending_hint', 'tu2')
+    expect(h.provider.sendToolResult).toHaveBeenLastCalledWith('tu2', { hint: null })
+    expect(h.provider.sendToolResult).toHaveBeenCalledTimes(2)
+    expect(h.provider.injectSystemText).not.toHaveBeenCalled()
+  })
+
+  it('adds exactly the first gap line to the OpenAI delta and preserves legacy bytes when absent or empty', () => {
+    for (const openai of [true]) {
       const h = harness(openai)
-      const output = () => 'updateInstructions' in h.provider
-        ? h.provider.updateInstructions.mock.calls.at(-1)![0]
-        : h.provider.injectSystemText.mock.calls.at(-1)![0]
+      const output = () => h.provider.updateInstructions!.mock.calls.at(-1)![0]
       h.pushLocalizerContext({})
-      const legacy = openai
-        ? 'BASE\n\n[LATEST LOCALIZER PUSH]\n- Top differentials: (none yet)\n- Suggested next question: (none)\n- Suggested scale to consider: (none)'
-        : '[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]\n[Localizer update]\n- Differentials (private): (none yet)\n- Suggested angle for next question (silent): (none)\n- Scale to consider (do not name to patient): (none)'
+      const legacy =
+        'BASE\n\n[LATEST LOCALIZER PUSH]\n- Top differentials: (none yet)\n- Suggested next question: (none)\n- Suggested scale to consider: (none)'
       expect(output()).toBe(legacy)
       h.pushLocalizerContext({ attending_gaps: [] })
       expect(output()).toBe(legacy)
@@ -118,11 +155,11 @@ const flushDetail = async () => { for (let i = 0; i < 8; i++) await Promise.reso
 
 it('pushes before unresolved detail, then merges only clinician fields with a second callback', async () => {
   const onLocalizerUpdate = vi.fn()
-  const h = harness(false, { localizerDetail: true, onLocalizerUpdate })
+  const h = harness(true, { localizerDetail: true, onLocalizerUpdate })
   let resolveDetail!: (value: unknown) => void
   h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
   await h.runLocalizer()
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
   expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
   expect(JSON.parse(h.fetch.mock.calls[1][1].body)).toMatchObject({ mode: 'detail', detail_input: steerResponse.detail_input })
   resolveDetail(response(detailResponse))
@@ -132,7 +169,7 @@ it('pushes before unresolved detail, then merges only clinician fields with a se
   expect(h.localizerDataRef.current).toMatchObject({ differential: detailResponse.differential,
     push_payload: steerResponse.push_payload, kbSources: steerResponse.kbSources })
   expect(h.localizerDataRef.current).not.toHaveProperty('detail_input')
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
   expect(h.detailInFlightRef.current).toBeNull()
 })
 
@@ -154,7 +191,7 @@ it('defaults to steer only even when transport inputs are returned', async () =>
 })
 
 it.each(['newer cycle', 'ended', 'new session', 'aborted', 'failed detail'])('drops late detail after %s', async reason => {
-  const h = harness(false, { localizerDetail: true })
+  const h = harness(true, { localizerDetail: true })
   let resolveDetail!: (value: unknown) => void
   h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
   await h.runLocalizer()
@@ -165,5 +202,5 @@ it.each(['newer cycle', 'ended', 'new session', 'aborted', 'failed detail'])('dr
   resolveDetail(response({ ...detailResponse, partial: reason === 'failed detail' }))
   await flushDetail()
   expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
-  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.provider.updateInstructions).toHaveBeenCalledTimes(1)
 })
