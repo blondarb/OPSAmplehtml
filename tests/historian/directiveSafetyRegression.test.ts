@@ -61,3 +61,7 @@ describe('directive mode preserves the safety floor', () => {
     expect(prompt).toMatch(/Do NOT exceed \d+ turns total/)
   })
 })
+
+ it('keeps attending supervision private', () => {
+  expect(buildHistorianSystemPrompt('new_patient')).toContain("Attending-review notes are private supervision. Ask the question naturally in your own words. Never say 'the attending', 'my supervisor', 'I was told to ask', or read the note aloud.")
+})

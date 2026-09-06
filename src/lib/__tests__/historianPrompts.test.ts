@@ -316,3 +316,7 @@ describe('getHistorianToolDefinition', () => {
     expect(tool.parameters.properties.prev_response).toBeDefined()
   })
 })
+
+ it('keeps attending supervision private', () => {
+  expect(buildHistorianSystemPrompt('new_patient')).toContain("Attending-review notes are private supervision. Ask the question naturally in your own words. Never say 'the attending', 'my supervisor', 'I was told to ask', or read the note aloud.")
+})
