@@ -617,7 +617,8 @@ export async function runIndependentDdxAndAgreement(
     modelId: HAIKU_MODEL_ID,
     promptVersion: AGREEMENT_PROMPT_VERSION,
     inferenceParams: { adjudicator_model: HAIKU_MODEL_ID },
-    result: agreement,
+    // Exclusions are report metadata only; computeAgreement sees ranked arrays alone.
+    result: { ...agreement, excluded_count: finalDifferential.excluded?.length ?? 0 },
     usage: {},
     latencyMs: Date.now() - agreementStart,
   })

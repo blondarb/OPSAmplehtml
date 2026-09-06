@@ -33,7 +33,7 @@ import {
   MAX_TRANSCRIPT_CHARS,
   MIN_PATIENT_TURNS,
 } from '@/lib/historian/eval/finalDifferential'
-import { PROMPT_VERSIONS } from '@/lib/historian/eval/constants'
+
 import { BEDROCK_MODEL } from '@/lib/bedrock'
 
 function entry(overrides: Partial<HistorianTranscriptEntry> = {}): HistorianTranscriptEntry {
@@ -189,7 +189,7 @@ describe('generateFinalDifferential', () => {
       const result = await generateFinalDifferential([])
 
       expect(result.provenance.model_id).toBe('none')
-      expect(result.provenance.prompt_version).toBe(PROMPT_VERSIONS['final-ddx-v1'].id)
+      expect(result.provenance.prompt_version).toBe('final-ddx-v2')
       expect(result.provenance.inference_params).toEqual({})
       expect(() => new Date(result.provenance.generated_at).toISOString()).not.toThrow()
     })
@@ -229,8 +229,8 @@ describe('generateFinalDifferential', () => {
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
 
     expect(result.provenance.model_id).toBe(BEDROCK_MODEL)
-    expect(result.provenance.prompt_version).toBe('final-ddx-v1')
-    expect(result.provenance.prompt_version).toBe(PROMPT_VERSIONS['final-ddx-v1'].id)
+    expect(result.provenance.prompt_version).toBe('final-ddx-v2')
+    expect(result.provenance.prompt_version).toBe('final-ddx-v2')
     expect(typeof result.provenance.inference_params).toBe('object')
     expect(() => new Date(result.provenance.generated_at).toISOString()).not.toThrow()
     expect(new Date(result.provenance.generated_at).toString()).not.toBe('Invalid Date')

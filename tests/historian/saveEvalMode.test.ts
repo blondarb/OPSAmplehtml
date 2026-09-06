@@ -80,7 +80,7 @@ describe('historian save evaluation mode behavior', () => {
     expect((await postSave()).status).toBe(200)
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(queryMock.mock.calls.filter(([sql]) => String(sql).startsWith('UPDATE historian_sessions SET final_differential'))).toHaveLength(0)
-    expect(runFinalDifferentialMock).toHaveBeenCalledWith('saved-session-id', VALID_TRANSCRIPT, undefined)
+    expect(runFinalDifferentialMock).toHaveBeenCalledWith('saved-session-id', VALID_TRANSCRIPT, undefined, { structured_output: null })
     expect(runThoroughnessMock).toHaveBeenCalledOnce()
     expect(runIndependentMock).toHaveBeenCalledWith('saved-session-id', VALID_TRANSCRIPT, undefined)
     expect(runFinalDifferentialMock.mock.invocationCallOrder[0]).toBeLessThan(runThoroughnessMock.mock.invocationCallOrder[0])

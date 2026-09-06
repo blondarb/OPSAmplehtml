@@ -1138,3 +1138,18 @@ supplied window are not gaps. Truncation can hide previously asked questions.
 
 A2 will consume the optional payload in the client; A1 makes no client changes.
 These are synthetic software checks, not clinical validation or activation.
+
+
+### 2026-09-05 differential precision (v2)
+
+The retrospective physician/QA final differential uses `final-ddx-v2` with the existing Bedrock model. It receives the saved `structured_output` JSON (pretty-printed, capped at 6,000 characters) as well as the transcript and available chief complaint. Its optional additive fields preserve compatibility with v1 records:
+
+- Each ranked `differential[]` item may include `confidence_note` (200 characters maximum), citing the source or coverage gap limiting confidence.
+- `excluded[]` contains up to five `{ diagnosis, exclusion_reason, evidence_quote? }` items. Diagnosis is capped at 200 characters and reason/quote at 1,000. Blank reasons are dropped. An optional quote must match a single transcript turn verbatim; invalid/oversized quotes are dropped and counted in `dropped_quotes` alongside ranked-item quote failures.
+- `unassessed[]` contains up to eight short rubric-topic labels (80 characters maximum), computed before inference using `loadRubric` and `computeCriticalCoverage`. Only critical items with unmatched coverage hints qualify; items with no hints are unknown and omitted. Rubric loading failure returns an empty list and logs only a fixed event name. The model cannot replace these labels.
+
+**Positive-evidence rule:** an exclusion requires concrete source evidence, cited by transcript quote/turn or saved structured field path and value. Missing history is never evidence of absence. If a discriminating question was not asked, the candidate stays ranked with a confidence note. Every gap that could change ranking must be reflected on the affected candidate. Diagnoses and exclusions remain provisional and require physician verification; no diagnosis is established by this output.
+
+The runs view shows confidence notes beneath ranked items, provisional exclusions with reasons and muted quotes, and “Not assessed in this interview.” Read that last list as a lexical coverage screen: it can miss alternate wording and can match a question without an adequate answer. It is neither proof that a topic was never discussed nor an exhaustive assessment checklist; an empty list does not establish completeness. Truncated saved output also does not establish absence of omitted findings.
+
+Agreement compares only ranked `differential[]` arrays. The persisted agreement evaluation report adds `excluded_count` as metadata; exclusions never enter ranking or agreement math. v1 records with absent fields retain their existing layout. No migration, model change, clinical validation, or deployment is included.

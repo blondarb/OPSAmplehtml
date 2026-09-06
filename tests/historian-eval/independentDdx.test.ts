@@ -353,6 +353,21 @@ describe('runIndependentDdxAndAgreement (save-route fire-and-forget wrapper)', (
     expect(evaluatorNames).toContain('agreement')
   })
 
+  it('ignores excluded diagnoses in agreement and reports excluded_count', async () => {
+    const results = []
+    for (const excluded of [[], [{ diagnosis: 'Synthetic excluded diagnosis', exclusion_reason: 'Synthetic field evidence' }]]) {
+      bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
+      poolQueryMock.mockResolvedValueOnce({ rows: [{ final_differential: { differential: JSON.parse(VALID_DDX_JSON).differential, excluded } }] })
+      await runIndependentDdxAndAgreement('synthetic-session', SAMPLE_TRANSCRIPT)
+      results.push(persistEvaluationMock.mock.calls.filter((c) => c[0].evaluator === 'agreement').at(-1)![0].result)
+    }
+    const { excluded_count: firstCount, ...firstMetrics } = results[0]
+    const { excluded_count: secondCount, ...secondMetrics } = results[1]
+    expect(firstCount).toBe(0)
+    expect(secondCount).toBe(1)
+    expect(secondMetrics).toEqual(firstMetrics)
+  })
+
   it('persists independent_ddx but skips agreement quietly when final_differential is not yet present', async () => {
     bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
     poolQueryMock.mockResolvedValueOnce({ rows: [{ final_differential: null }] })

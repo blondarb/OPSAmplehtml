@@ -80,6 +80,21 @@ describe('runs view differential', () => {
     expect(markup).toContain('text-amber-300')
   })
 
+  it('renders v2 confidence notes, excluded evidence and deterministic gaps', () => {
+    const v2 = { ...finalDifferential,
+      provenance: { ...finalDifferential.provenance, prompt_version: 'final-ddx-v2' },
+      differential: [{ ...finalDifferential.differential[0], confidence_note: 'Time course needs verification' }],
+      excluded: [{ diagnosis: 'Synthetic alternative', exclusion_reason: 'Synthetic source reason', evidence_quote: 'Synthetic verbatim evidence' }],
+      unassessed: ['time course'],
+    }
+    const markup = render(makeRun({ final_differential: v2 }))
+    for (const text of ['Time course needs verification', 'Synthetic alternative', 'Synthetic source reason', 'Synthetic verbatim evidence', 'Not assessed in this interview', 'time course']) expect(markup).toContain(text)
+    const legacy = render(makeRun({ final_differential: finalDifferential }))
+    expect(legacy).not.toContain('Not assessed in this interview')
+    expect(legacy).not.toContain('Confidence limited:')
+    expect(render(makeRun({ final_differential: { ...v2, differential: [] } }))).toContain('Not assessed in this interview')
+  })
+
   it('renders both sources in order and preserves localizer extras', () => {
     const localizer = [{ diagnosis: 'Synthetic localizer diagnosis', confidence: 'high' as const }]
     const run = makeRun({

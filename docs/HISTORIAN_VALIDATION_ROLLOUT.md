@@ -8,6 +8,12 @@
 
 Six phases, all code-reviewed (per-task + whole-branch): durable transcript event log + flush endpoint (P1), final full-transcript differential + investigational card (P2), thoroughness judge + fidelity screen + unvetted-rubric system (P3), independent DeepSeek-R1 differential + agreement metrics + **GET /api/ai/historian/save now Cognito-authed** (P4), batch eval harness + QI report + release gates with committed baseline (P5), synthetic patient conversation driver (P6, live gate deferred — see §5).
 
+## Differential record v2 — 2026-09-05
+
+`final-ddx-v2` adds optional ranked-item `confidence_note`, record-level `excluded`, and deterministic `unassessed` fields; v1 readers remain compatible. See [the differential precision contract](PRD_AI_HISTORIAN.md#2026-09-05-differential-precision-v2) for caps and source-grounding rules. Exclusions require positive evidence, never missing history. Unassessed labels indicate unmatched critical rubric hints, not definitive absence of assessment. Invalid excluded transcript quotes increment the existing `dropped_quotes` count.
+
+The agreement evaluation's persisted `result` now includes `excluded_count` (zero for absent/v1 exclusions), while metric inputs remain the two ranked arrays. This source change does not authorize the historical live/backfill steps below. The v2 identifier is defined in `finalDifferential.ts`; adding it to the shared prompt registry is deferred because that file is outside the A3 scope fence.
+
 ## The single approval = these irreversible steps, batched
 
 Everything below is ONE approval. Steps 1–2 are the irreversible ones (RDS + main); the rest are verification.

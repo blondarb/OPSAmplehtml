@@ -24,6 +24,7 @@ interface DifferentialEntry {
   diagnosis?: string
   name?: string
   icd10?: string | null
+  confidence_note?: string
   rationale?: string
   evidence_against?: string
   likelihood?: 'high' | 'medium' | 'low'
@@ -33,6 +34,7 @@ interface DifferentialEntry {
 interface ExcludedEntry {
   diagnosis?: string
   reason?: string
+  evidence_quote?: string
 }
 
 interface RunRow extends Omit<HistorianSession, 'final_differential'> {
@@ -52,6 +54,7 @@ interface ResolvedDifferential {
   source: 'localizer' | 'final'
   label: string
   summary?: string
+  unassessed?: string[]
   /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
   excluded?: ExcludedEntry[]
 }
@@ -67,19 +70,23 @@ export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
     })
   }
   const final = run.final_differential
-  if (final && 'differential' in final && Array.isArray(final.differential) && final.differential.length > 0) {
+  if (final && 'differential' in final && Array.isArray(final.differential) && (final.differential.length > 0 || final.excluded?.length || final.unassessed?.length)) {
     sources.push({
       entries: final.differential.map((item) => ({
         diagnosis: item.diagnosis,
         icd10: item.icd10,
         rationale: item.rationale,
+        ...(item.confidence_note ? { confidence_note: item.confidence_note } : {}),
         evidence_against: (item as any).evidence_against,
         likelihood: item.likelihood === 'Moderate' ? 'medium' : item.likelihood === 'High' ? 'high' : 'low',
       })),
       source: 'final',
       label: 'Post-interview eval',
       summary: final.summary,
-      excluded: Array.isArray((final as any)?.excluded) ? (final as any).excluded : [],
+      excluded: Array.isArray(final.excluded) ? final.excluded.map((item) => ({
+        diagnosis: item.diagnosis, reason: item.exclusion_reason, evidence_quote: item.evidence_quote,
+      })) : [],
+      ...(final.unassessed?.length ? { unassessed: final.unassessed } : {}),
     })
   }
   return sources
@@ -464,7 +471,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </div>
         )}
 
-        {differentials.map(({ entries: ddx, source, label, summary, excluded }) => (
+        {differentials.map(({ entries: ddx, source, label, summary, excluded, unassessed }) => (
           <Section key={source} title={
             <>
               Differential Diagnosis &amp; Reasoning
@@ -493,6 +500,9 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
                         {d.rationale}
                       </p>
                     )}
+                    {d.confidence_note && (
+                      <p className="mt-1 text-xs text-amber-300">Confidence limited: {d.confidence_note}</p>
+                    )}
                     {d.evidence_against && (
                       <p className="mt-1 text-sm leading-relaxed text-slate-400">
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500/80">Against · </span>
@@ -505,15 +515,23 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
             </div>
             {Array.isArray(excluded) && excluded.length > 0 && (
               <div className="mt-3">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Considered &amp; ruled out</div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{source === 'final' ? 'Considered and excluded (provisional)' : 'Considered & ruled out'}</div>
                 <div className="space-y-1.5">
                   {excluded.map((e, i) => (
                     <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
-                      <div className="text-sm font-medium text-slate-300 line-through decoration-slate-600">{e.diagnosis}</div>
-                      {e.reason && <div className="mt-0.5 text-xs text-slate-400">Ruled out — {e.reason}</div>}
+                      <div className={`text-sm font-medium text-slate-300 ${source === 'localizer' ? 'line-through decoration-slate-600' : ''}`}>{e.diagnosis}</div>
+                      {e.evidence_quote && <p className="mt-1 text-xs text-slate-500">“{e.evidence_quote}”</p>}
+                      {e.reason && <div className="mt-0.5 text-xs text-slate-400">{source === 'localizer' ? 'Ruled out — ' : ''}{e.reason}</div>}
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {unassessed && unassessed.length > 0 && (
+              <div className="mt-3 text-sm text-slate-400">
+                <h4 className="font-semibold">Not assessed in this interview</h4>
+                <p className="mt-1 text-xs text-slate-500">No coverage hint detected; verify these possible gaps against the interview. Missing history is not evidence of absence.</p>
+                <ul className="mt-1 list-disc pl-5">{unassessed.map((topic) => <li key={topic}>{topic}</li>)}</ul>
               </div>
             )}
             {source === 'final' && (
