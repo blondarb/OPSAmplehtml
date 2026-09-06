@@ -23,7 +23,8 @@ import { sanitizeAttendingGaps } from '@/lib/consult/attendingSanitize'
 import { from } from '@/lib/db-query'
 import { getNeuroPlansPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
-import { CONSULT_SCALE_DEFINITIONS } from '@/lib/consult/scales/scale-library'
+import { CONSULT_SCALE_DEFINITIONS, getAdministrationQuestions } from '@/lib/consult/scales/scale-library'
+import { namesDiagnosis } from '@/lib/consult/attendingSanitize'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
 import type {
   AttendingMeta,
@@ -53,13 +54,17 @@ const EXCLUDED_FIELD_MAX_LEN = 200
 // see src/lib/historian/eval/finalDifferential.ts) so both call sites stay
 // byte-identical instead of drifting. Imported above.
 
+// Only scales that scale_step can actually voice-administer; the rest (nihss, moca, mini_cog) 422 on
+// /api/ai/historian/scales?action=step and would cost Henry a wasted turn.
+const STEER_SCALE_IDS = Object.keys(CONSULT_SCALE_DEFINITIONS).filter((id) => getAdministrationQuestions(id) !== null)
+
 const STEER_GENERATOR_PROMPT = `Generate a compact steer for an in-progress patient intake from the supplied symptoms, guidelines, and session type.
 Return only JSON:
 {"followUpQuestions":["string"],"localizationHypothesis":"string","differential":[{"diagnosis":"string","likelihood":"high | medium | low"}],"suggestedScaleId":null}
 Use at most 3 patient-facing follow-up questions, each containing one question in plain language and no diagnosis names. Target gaps that distinguish the leading possibilities; for follow-up sessions focus on interval change and treatment response.
 Keep localizationHypothesis at most 160 characters; use an empty string if insufficient information.
 List at most 3 differential names with likelihood only, based on reported evidence; default to medium if insufficient data to rank. Do not include rationale, codes, exclusions, or actions.
-Set suggestedScaleId to a matching clinical scale id only when indicated, otherwise null. Available ids: ${Object.keys(CONSULT_SCALE_DEFINITIONS).join(', ')}.
+Set suggestedScaleId to a matching clinical scale id only when indicated, otherwise null. Available ids: ${STEER_SCALE_IDS.join(', ')}.
 Do not fabricate patient evidence.`
 
 interface GeneratedSteer {
@@ -500,11 +505,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               signal,
             })
             steer = {
-              followUpQuestions: parsed.followUpQuestions.filter(q => typeof q === 'string').slice(0, 3),
+              // Patient-facing: drop any question that names a diagnosis (same lexicon as the attending gaps).
+              followUpQuestions: parsed.followUpQuestions.filter(q => typeof q === 'string' && !namesDiagnosis(q)).slice(0, 3),
               localizationHypothesis: parsed.localizationHypothesis.slice(0, 160),
               differential: parsed.differential.slice(0, 3).map(d => ({ diagnosis: d.diagnosis, likelihood: d.likelihood })),
               suggestedScaleId: typeof parsed.suggestedScaleId === 'string' &&
-                Object.prototype.hasOwnProperty.call(CONSULT_SCALE_DEFINITIONS, parsed.suggestedScaleId) ? parsed.suggestedScaleId : null,
+                STEER_SCALE_IDS.includes(parsed.suggestedScaleId) ? parsed.suggestedScaleId : null,
             }
           } catch (err) {
             if (signal.aborted) throw err

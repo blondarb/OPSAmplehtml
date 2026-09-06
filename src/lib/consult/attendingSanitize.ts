@@ -15,7 +15,9 @@ export interface AttendingGap {
 const escapeTerm = (term: string) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const diagnosisPattern = new RegExp(`\\b(?:${ATTENDING_DIAGNOSIS_NAMES.map(escapeTerm).join('|')})\\b`, 'i')
 const acronymPattern = new RegExp(`\\b(?:${ATTENDING_DIAGNOSIS_ACRONYMS.map(escapeTerm).join('|')})\\b`)
-const namesDiagnosis = (text: string) => diagnosisPattern.test(text) || acronymPattern.test(text)
+/** True when the text names a diagnosis (word-boundary lexicon + case-sensitive acronyms). Shared by the attending
+ *  gaps and the localizer steer questions — both are patient-facing text that Henry may read verbatim. */
+export const namesDiagnosis = (text: string) => diagnosisPattern.test(text) || acronymPattern.test(text)
 
 export function sanitizeAttendingGaps(raw: unknown): AttendingGap[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []

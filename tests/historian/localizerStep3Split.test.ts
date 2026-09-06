@@ -117,11 +117,21 @@ it.each([true, false])('preserves outer timeout semantics with completed steer =
   expect(vi.getTimerCount()).toBe(0)
 })
 
-it.each(['not-a-scale', 'toString'])('rejects an unregistered scale id: %s', async suggestedScaleId => {
+it.each(['not-a-scale', 'toString', 'nihss', 'moca', 'mini_cog'])('rejects an unregistered or non-voice-administrable scale id: %s', async suggestedScaleId => {
   const original = mocks.invoke.getMockImplementation()!
   mocks.invoke.mockImplementation(opts => opts.maxTokens === 300 ? Promise.resolve({ parsed: { ...steer, suggestedScaleId } })
     : opts.maxTokens === 900 ? Promise.reject(new Error('Synthetic failure')) : original(opts))
   const body = await (await POST(request())).json()
   expect(body.push_payload.suggested_scale_id).toBeNull()
   expect(body.degradedReason).toBe('Question generation failed')
+})
+
+it('drops a steer question that names a diagnosis before it can reach Henry', async () => {
+  const original = mocks.invoke.getMockImplementation()!
+  mocks.invoke.mockImplementation(opts => opts.maxTokens === 300
+    ? Promise.resolve({ parsed: { ...steer, followUpQuestions: ['Have you had a stroke before?', 'Any history of MS?', steer.followUpQuestions[0]] } })
+    : opts.maxTokens === 900 ? Promise.reject(abortError()) : original(opts))
+  const body = await (await POST(request())).json()
+  expect(body.push_payload.suggested_next_question).toBe(steer.followUpQuestions[0])
+  expect(body.followUpQuestions).toEqual([steer.followUpQuestions[0]])
 })
