@@ -88,6 +88,7 @@ describe('save/route.ts final-differential hook', () => {
       'saved-session-id',
       VALID_TRANSCRIPT,
       undefined,
+      { structured_output: null },
     )
   })
 
@@ -99,6 +100,7 @@ describe('save/route.ts final-differential hook', () => {
       'saved-session-id',
       VALID_TRANSCRIPT,
       'headache x3 days',
+      { structured_output: { chief_complaint: 'headache x3 days' } },
     )
   })
 
@@ -110,6 +112,7 @@ describe('save/route.ts final-differential hook', () => {
       'saved-session-id',
       VALID_TRANSCRIPT,
       'referred for headache eval',
+      { structured_output: null },
     )
   })
 

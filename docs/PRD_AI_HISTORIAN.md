@@ -1139,6 +1139,24 @@ supplied window are not gaps. Truncation can hide previously asked questions.
 A2 will consume the optional payload in the client; A1 makes no client changes.
 These are synthetic software checks, not clinical validation or activation.
 
+
+### 2026-09-06 differential precision review fixes (v3)
+
+The retrospective physician/QA final differential uses `final-ddx-v3` with the existing Bedrock model and a 6,000-token output budget. Saved `structured_output` is serialized compactly, whole top-level fields only, within 6,000 characters; `[omitted fields: …]` names omitted fields. Unshown or partial fields are unknown, never exclusion evidence. The driver must re-run the live gate; prior v2 or earlier results do not validate v3.
+
+- Ranked `differential[]` items may include `confidence_note` (200 characters maximum).
+- `excluded[]` contains up to five provisional items. Diagnosis is capped at 200 characters; `exclusion_reason` and `evidence_quote` at 300. Every new exclusion requires a verbatim quote from a single Patient (`role === 'user'`) turn. Failed quotes remove the entire item and increment both `dropped_quotes` and `dropped_exclusions`. Missing evidence, blank reasons, and listed assessment-gap conflicts also remove exclusions and increment `dropped_exclusions`. Legacy records may lack this new count.
+- `unassessed[]` contains up to eight readable rubric questions. The prompt receives both the topic label and question text; the sanitizer also receives its coverage hints. A case-insensitive reason match on a listed label or hint removes the exclusion and adds a confidence limitation to the matching ranked diagnosis, if present.
+- `exclusion_audit_flags` lists retained excluded diagnoses whose reasons contain “not asked,” “never asked,” “not assessed,” “not discussed,” “no information,” or “unclear whether.” This is an audit signal, not an additional drop rule. Patient denials are not flagged merely for saying “no” or “denies.”
+
+**Positive Patient evidence only:** an exclusion may rest only on an explicit Patient denial or an incompatible finding stated by the Patient in the transcript. Historian questions are not evidence. Henry's saved structured output is AI-generated from the same transcript: it may corroborate but never be the sole basis. A listed UNASSESSED topic can never ground an exclusion. Silence is never evidence of absence. An empty excluded list is expected when positive Patient evidence is unavailable. Quote matching verifies text provenance, not the clinical validity of an exclusion; physician review remains required.
+
+**Reading rules and surface boundaries:** v2/v3 confidence notes, exclusions, and unassessed fields render in the runs view; confidence notes also render beneath rationale on the physician DifferentialCard and DdxComparisonCard as “Confidence limited:”. The runs view shows dropped-exclusion and audit-flag counts. Excluded and unassessed fields do not reach the patient report or note import. A quoted phrase inside a reason is not verified text; only the `evidence_quote` line passed transcript verification (v3 additionally restricts it to Patient turns; historical v2 checks allowed any role). The v3 prompt puts transcript evidence only in `evidence_quote`, never quoted inside `exclusion_reason`.
+
+UNASSESSED is a **non-exhaustive keyword screen**, not proof of missing assessment or a complete checklist: criticals without hints never appear, and no syndrome match means the section is omitted. Hints may match a question without an adequate Patient answer or miss alternate wording. Confidence notes may name gaps the screen missed. Insufficient-transcript records have no unassessed topics and never produce a post-interview differential section. Rationale, summary, confidence notes and exclusion reasons describe evidence and uncertainty only, without management, testing, referral or treatment recommendations.
+
+Agreement compares only ranked arrays. CLI and live persistence use the shared `withExcludedCount` helper for homogeneous `excluded_count` metadata (zero for absent/v1 exclusions). No migration, model change, deployment or clinical validation is included. Deferred: shared prompt-registry entry (outside this scope) and driver-run live-gate validation.
+
 ### 2026-09-05 attending review (client)
 
 The hook owns the single localizer push channel for every consumer that enables

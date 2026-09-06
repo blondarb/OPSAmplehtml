@@ -617,8 +617,14 @@ export async function runIndependentDdxAndAgreement(
     modelId: HAIKU_MODEL_ID,
     promptVersion: AGREEMENT_PROMPT_VERSION,
     inferenceParams: { adjudicator_model: HAIKU_MODEL_ID },
-    result: agreement,
+    // Exclusions are report metadata only; computeAgreement sees ranked arrays alone.
+    result: withExcludedCount(agreement, finalDifferential),
     usage: {},
     latencyMs: Date.now() - agreementStart,
   })
+}
+
+/** Shared persistence metadata; exclusions never enter agreement scoring. */
+export function withExcludedCount(agreement: AgreementResult, final: Pick<FinalDifferential, 'excluded'> | null | undefined): AgreementResult & { excluded_count: number } {
+  return { ...agreement, excluded_count: final?.excluded?.length ?? 0 }
 }

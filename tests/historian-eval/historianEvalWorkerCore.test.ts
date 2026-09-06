@@ -28,11 +28,18 @@ describe('historian evaluation worker', () => {
     const deps = setup()
     expect(await processHistorianEvalSqsEvent(event, deps)).toEqual({ batchItemFailures: [] })
     expect(deps.loadSession).toHaveBeenCalledTimes(2)
-    expect(deps.runFinalDifferential).toHaveBeenCalledWith(id, [], 'Synthetic referral', { signal: expect.any(AbortSignal), persistErrorRecord: true })
+    expect(deps.runFinalDifferential).toHaveBeenCalledWith(id, [], 'Synthetic referral', { signal: expect.any(AbortSignal), persistErrorRecord: true, structured_output: null })
     expect(deps.runThoroughnessJudge).toHaveBeenCalledWith(id, [], expect.objectContaining({ reports: { narrative_summary: 'Synthetic summary' }, signal: expect.any(AbortSignal) }))
     expect(deps.runFinalDifferential.mock.invocationCallOrder[0]).toBeLessThan(deps.runThoroughnessJudge.mock.invocationCallOrder[0])
     expect(deps.runThoroughnessJudge.mock.invocationCallOrder[0]).toBeLessThan(deps.runIndependentDdxAndAgreement.mock.invocationCallOrder[0])
     expect(deps.persistError).not.toHaveBeenCalled()
+  })
+  it('passes saved structured output to the final differential', async () => {
+    const deps = setup()
+    const structured_output = { chief_complaint: 'Synthetic complaint', alcohol_use: 'Synthetic field' }
+    deps.loadSession.mockReset().mockResolvedValue({ id, transcript: [], structured_output })
+    await processHistorianEvalSqsEvent(event, deps)
+    expect(deps.runFinalDifferential).toHaveBeenCalledWith(id, [], 'Synthetic complaint', expect.objectContaining({ structured_output }))
   })
   it.each([
     [{ name: 'ThrottlingException' }, 'bedrock', true],

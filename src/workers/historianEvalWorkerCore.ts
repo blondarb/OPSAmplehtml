@@ -17,7 +17,7 @@ export interface HistorianEvalSession {
 export interface HistorianEvalWorkerDependencies {
   query: (sql: string, values: unknown[]) => Promise<{ rows: unknown[] }>
   loadSession: (id: string) => Promise<HistorianEvalSession | null>
-  runFinalDifferential: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: { signal?: AbortSignal; persistErrorRecord?: boolean }) => Promise<FinalDifferentialExecution | void>
+  runFinalDifferential: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: import('@/lib/historian/eval/finalDifferential').FinalDifferentialOptions & { persistErrorRecord?: boolean }) => Promise<FinalDifferentialExecution | void>
   runThoroughnessJudge: (id: string, transcript: HistorianTranscriptEntry[], opts: ThoroughnessJudgeOptions) => Promise<unknown>
   runIndependentDdxAndAgreement: (id: string, transcript: HistorianTranscriptEntry[], complaint?: string, opts?: { signal?: AbortSignal }) => Promise<unknown>
   persistError: (id: string, error: FinalDifferentialError) => Promise<unknown>
@@ -77,7 +77,7 @@ export async function processHistorianEvalSqsEvent(event: SQSEvent, deps: Histor
       if (!['ok', 'insufficient_transcript'].includes(session.final_differential?.status ?? '')) {
         try {
           const outcome = await bounded(Math.min(300_000, remaining()), (signal) =>
-            deps.runFinalDifferential(sessionId!, transcript, complaint, { signal, persistErrorRecord: true }))
+            deps.runFinalDifferential(sessionId!, transcript, complaint, { signal, persistErrorRecord: true, structured_output: session.structured_output ?? null }))
           if (outcome?.error) throw outcome.error
           const updated = await load()
           if (!['ok', 'insufficient_transcript'].includes(updated?.final_differential?.status ?? '')) {

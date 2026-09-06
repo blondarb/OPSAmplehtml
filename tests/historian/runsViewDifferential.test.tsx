@@ -62,6 +62,8 @@ describe('runs view differential', () => {
       label: 'Post-interview eval',
       summary: finalDifferential.summary,
       excluded: [],
+      dropped_exclusions: 0,
+      exclusion_audit_flags: [],
       entries: finalDifferential.differential.map((item, i) => ({
         diagnosis: item.diagnosis,
         icd10: item.icd10,
@@ -78,6 +80,21 @@ describe('runs view differential', () => {
     expect(markup).toContain(finalDifferential.summary)
     expect(markup).toContain(INVESTIGATIONAL_BANNER)
     expect(markup).toContain('text-amber-300')
+  })
+
+  it('renders v2 confidence notes, excluded evidence and deterministic gaps', () => {
+    const v2 = { ...finalDifferential,
+      provenance: { ...finalDifferential.provenance, prompt_version: 'final-ddx-v2' },
+      differential: [{ ...finalDifferential.differential[0], confidence_note: 'Time course needs verification' }],
+      excluded: [{ diagnosis: 'Synthetic alternative', exclusion_reason: 'Synthetic source reason', evidence_quote: 'Synthetic verbatim evidence' }],
+      unassessed: ['time course'],
+    }
+    const markup = render(makeRun({ final_differential: v2 }))
+    for (const text of ['Time course needs verification', 'Synthetic alternative', 'Synthetic source reason', 'Synthetic verbatim evidence', 'Not assessed in this interview', 'time course']) expect(markup).toContain(text)
+    const legacy = render(makeRun({ final_differential: finalDifferential }))
+    expect(legacy).not.toContain('Not assessed in this interview')
+    expect(legacy).not.toContain('Confidence limited:')
+    expect(render(makeRun({ final_differential: { ...v2, differential: [] } }))).toContain('Not assessed in this interview')
   })
 
   it('renders both sources in order and preserves localizer extras', () => {
@@ -135,4 +152,18 @@ describe('patientLabel', () => {
   it('preserves other unlinked labels', () => {
     expect(patientLabel(makeRun({ patient_name: 'Synthetic custom label' }))).toBe('Synthetic custom label')
   })
+})
+
+it('hides post-interview sections for insufficient records even with legacy gaps', () => {
+  const run = makeRun({ final_differential: { ...finalDifferential, status: 'insufficient_transcript', differential: [], unassessed: ['Fever assessment'] } })
+  expect(resolveDifferentials(run)).toEqual([])
+  expect(render(run)).not.toContain('Post-interview eval')
+  expect(render(run)).not.toContain('Not assessed in this interview')
+})
+it('renders dropped exclusions even when every exclusion was removed, plus audit count', () => {
+  const run = makeRun({ final_differential: { ...finalDifferential, differential: [], excluded: [], dropped_exclusions: 2, exclusion_audit_flags: ['Synthetic'], unassessed: ['When did symptoms start?'] } })
+  const markup = render(run)
+  expect(markup).toContain('2 exclusion(s) dropped')
+  expect(markup).toContain('1 exclusion audit flag(s)')
+  expect(markup).toContain('When did symptoms start?')
 })

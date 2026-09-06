@@ -530,7 +530,7 @@ async function persistSessionResults(
       modelId: runs.agreement.modelId,
       promptVersion: runs.agreement.promptVersion,
       inferenceParams: runs.agreement.inferenceParams ?? {},
-      result: runs.agreement.result,
+      result: (await import('./independentDdx')).withExcludedCount(runs.agreement.result, runs.finalDifferential.result),
       usage: {},
       latencyMs: runs.agreement.latencyMs,
     })
@@ -580,6 +580,7 @@ export async function runHydratedCase(
     const result = await deps.finalDifferentialMod.generateFinalDifferential(
       input.transcript,
       input.chiefComplaint ?? undefined,
+      { structured_output: input.structuredOutput, syndrome: input.syndrome ?? undefined },
     )
     finalDifferentialRun = {
       ok: true,

@@ -147,6 +147,7 @@ export async function POST(request: Request) {
           data.id,
           transcriptForEval,
           chiefComplaintForEval,
+          { structured_output: structuredOutputForEval },
         ).catch((err) => {
           console.error('[historian/save] final differential eval error (non-fatal):', err)
         })
