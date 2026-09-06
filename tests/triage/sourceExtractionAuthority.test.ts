@@ -1,9 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/triage/longPacketEmergency', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/triage/longPacketEmergency')>()
+  return {
+    ...actual,
+    scanLongPacketEmergency: vi.fn(actual.scanLongPacketEmergency),
+  }
+})
+
 import {
   buildLongPacketIngestionArtifacts,
   longPacketPipelineToClinicalExtraction,
   longPacketSourceDigest,
+  validatePersistedLongPacketModelSafetyArtifacts,
 } from '@/lib/triage/longPacketIngestion'
 import {
   hashLongPacketEmergency,
@@ -1490,5 +1500,115 @@ describe('validatePersistedSourceExtractionAuthority', () => {
     expect(decision).toMatchObject({ immediateActionRequired: false })
     expect(decision).not.toHaveProperty('safetyPathway')
     expect(decision).not.toHaveProperty('deterministicGateway')
+  })
+})
+
+describe('validation cost contract', () => {
+  it.each([
+    [
+      'a complete long-packet row',
+      (row: SourceExtractionAuthorityRow) => row,
+      { ok: true },
+    ],
+    [
+      'a recoverable hold on a complete long-packet row',
+      (row: SourceExtractionAuthorityRow) => {
+        row.status = 'error'
+        return row
+      },
+      {
+        ok: false,
+        reason: 'source_extraction_not_complete',
+        immediateActionRequired: true,
+        safetyPathway: 'same_day_clinician_review',
+      },
+    ],
+  ] as const)(
+    'scans the deterministic gateway exactly once when validating %s',
+    async (_label, arrange, expected) => {
+      const row = arrange(
+        await authoritativeLongPacketRow(
+          [ROUTINE_PAGE_ONE.repeat(700)],
+          'same_day_clinician_review',
+        ),
+      )
+      vi.mocked(scanLongPacketEmergency).mockClear()
+
+      const decision = validatePersistedSourceExtractionAuthority(row)
+
+      expect(decision).toMatchObject(expected)
+      expect(scanLongPacketEmergency).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('rejects a pre-scanned gateway that was not produced from the given plan', async () => {
+    // Receipt semantics do not depend on packet size; a 3-chunk packet keeps
+    // this test cheap while still exercising a multi-chunk plan.
+    const row = await authoritativeLongPacketRow(
+      [ROUTINE_PAGE_ONE.repeat(200)],
+      'same_day_clinician_review',
+    )
+    const otherPlan = authoritativeRow({
+      pageTexts: [ROUTINE_PAGE_ONE.repeat(100), ROUTINE_PAGE_TWO.repeat(100)],
+      sourceFilename: 'synthetic-other.pdf',
+      ingestionMode: 'long_packet',
+    }).packet_plan as LongPacketPlan
+    const plan = row.packet_plan as LongPacketPlan
+    const validate = (gateway: ReturnType<typeof scanLongPacketEmergency>) =>
+      validatePersistedLongPacketModelSafetyArtifacts({
+        sourcePages: row.source_pages,
+        packetPlan: plan,
+        deterministicGateway: gateway,
+        modelMapResult: row.model_map_result,
+        modelReduceResult: row.model_reduce_result,
+        safetyPromptVersions: row.safety_prompt_versions,
+      })
+
+    expect(() => validate(scanLongPacketEmergency(otherPlan))).toThrow(
+      /not scanned from this packet plan/,
+    )
+
+    // Same identifiers and chunk boundaries, different source content: the
+    // dangerous mismatch, where a stale routine scan could stand in for an
+    // emergency one (or the reverse).
+    const sameLayoutPlan = authoritativeRow({
+      pageTexts: [
+        ROUTINE_PAGE_ONE.replace('stable chronic', 'sudden aphasia').repeat(200),
+      ],
+      sourceFilename: 'synthetic-packet.pdf',
+      ingestionMode: 'long_packet',
+    }).packet_plan as LongPacketPlan
+    expect(sameLayoutPlan.chunks.map((chunk) => chunk.id)).toEqual(
+      plan.chunks.map((chunk) => chunk.id),
+    )
+    const sameLayoutGateway = scanLongPacketEmergency(sameLayoutPlan)
+    expect(sameLayoutGateway.carePathway).toBe('emergency_now')
+    expect(() => validate(sameLayoutGateway)).toThrow(
+      /not scanned from this packet plan/,
+    )
+
+    // A scan of the right plan that was modified afterwards is rejected too.
+    const tampered = scanLongPacketEmergency(plan)
+    tampered.carePathway = 'emergency_now'
+    expect(() => validate(tampered)).toThrow(/not scanned from this packet plan/)
+
+    // Persisted copies never carry a receipt, even when byte-identical.
+    expect(() => validate(structuredClone(scanLongPacketEmergency(plan)))).toThrow(
+      /not scanned from this packet plan/,
+    )
+
+    const fresh = scanLongPacketEmergency(plan)
+    expect(validate(fresh)).toEqual(
+      validatePersistedLongPacketModelSafetyArtifacts({
+        sourcePages: row.source_pages,
+        packetPlan: plan,
+        modelMapResult: row.model_map_result,
+        modelReduceResult: row.model_reduce_result,
+        safetyPromptVersions: row.safety_prompt_versions,
+      }),
+    )
+    expect(validate(fresh).safetyResult).toMatchObject({
+      carePathway: 'same_day_clinician_review',
+    })
   })
 })

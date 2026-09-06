@@ -7,6 +7,8 @@ import type {
 } from './types'
 import {
   LONG_PACKET_EMERGENCY_VERSION,
+  type LongPacketEmergencyResult,
+  isLongPacketEmergencyScanOf,
   scanLongPacketEmergency,
 } from './longPacketEmergency'
 import {
@@ -351,14 +353,37 @@ function safetyArtifactsFromValidatedPipeline(input: {
 }
 
 /**
+ * Fails closed unless the caller-provided gateway is the unmodified object
+ * `scanLongPacketEmergency` returned for a plan with exactly this content.
+ * Chunk ids or hashes supplied by a caller prove nothing; the receipt is held
+ * by the scanner itself.
+ */
+function assertGatewayScannedFromPlan(
+  gateway: LongPacketEmergencyResult,
+  plan: LongPacketPlan,
+): void {
+  if (!isLongPacketEmergencyScanOf(gateway, plan)) {
+    throw new Error(
+      'Provided deterministic gateway was not scanned from this packet plan.',
+    )
+  }
+}
+
+/**
  * Validates a complete persisted model pipeline against a caller-provided
  * deterministic plan that has been independently rebuilt from source pages.
  * This deliberately does not trust redundant persisted plan, digest, status,
  * or ingestion-label columns.
+ *
+ * `deterministicGateway` is the scan of exactly `packetPlan`. A caller that
+ * already rebuilt the plan and scanned it (the source-authority envelope)
+ * passes that result through so the packet is scanned once per validation;
+ * the scan is a pure function of the plan, so the result is identical.
  */
 export function validatePersistedLongPacketModelSafetyArtifacts(input: {
   sourcePages: unknown
   packetPlan: LongPacketPlan
+  deterministicGateway?: LongPacketEmergencyResult
   modelMapResult: unknown
   modelReduceResult: unknown
   safetyPromptVersions: unknown
@@ -389,7 +414,11 @@ export function validatePersistedLongPacketModelSafetyArtifacts(input: {
     },
   ]
   assertCompleteLongPacketCoverage(input.packetPlan, documents)
-  const gateway = scanLongPacketEmergency(input.packetPlan)
+  if (input.deterministicGateway) {
+    assertGatewayScannedFromPlan(input.deterministicGateway, input.packetPlan)
+  }
+  const gateway =
+    input.deterministicGateway ?? scanLongPacketEmergency(input.packetPlan)
   const pipeline = validatePersistedLongPacketModelPipeline(
     input.packetPlan,
     input.modelMapResult,
