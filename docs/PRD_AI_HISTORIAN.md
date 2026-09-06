@@ -1153,3 +1153,19 @@ The retrospective physician/QA final differential uses `final-ddx-v2` with the e
 The runs view shows confidence notes beneath ranked items, provisional exclusions with reasons and muted quotes, and “Not assessed in this interview.” Read that last list as a lexical coverage screen: it can miss alternate wording and can match a question without an adequate answer. It is neither proof that a topic was never discussed nor an exhaustive assessment checklist; an empty list does not establish completeness. Truncated saved output also does not establish absence of omitted findings.
 
 Agreement compares only ranked `differential[]` arrays. The persisted agreement evaluation report adds `excluded_count` as metadata; exclusions never enter ranking or agreement math. v1 records with absent fields retain their existing layout. No migration, model change, clinical validation, or deployment is included.
+### 2026-09-05 attending review (client)
+
+The hook owns the single localizer push channel for every consumer that enables
+the localizer; EmbeddedHistorian only receives panel updates. Each request keeps
+the existing eight-turn transcript and adds a per-session call counter, the
+existing safety-escalation state, and full transcript turns trimmed from the
+oldest end to at most 60,000 text characters. Counters reset at session start.
+
+Both providers privately receive only the first sanitized attending gap as the
+next-question suggestion. Absent/empty gaps leave the delta byte-identical.
+Speaking and safety guards remain in place. Nova is limited to 12 localizer
+injection attempts per session; OpenAI instruction rewrites remain uncapped.
+Safety escalation and pre-close messages use their existing separate paths and
+are not charged against this localizer ceiling. No server flags are changed.
+
+Patient-route reach: `/patient/historian` runs the localizer only when `NEXT_PUBLIC_HISTORIAN_PATIENT_STEER=true` (build-time, default off; PR #212); the clinician panel stays gated on `clinicianMirror`. Until that flag is on, attending gaps reach Henry only on `/consult/triage-historian` and the embedded consult flow.
