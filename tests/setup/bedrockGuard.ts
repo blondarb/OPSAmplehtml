@@ -18,12 +18,18 @@
  * Tests that `vi.mock('@/lib/bedrock')` or mock the SDK module themselves are
  * unaffected: a test-file `vi.mock` for the same specifier takes precedence.
  *
- * Deliberate live run:  VITEST_ALLOW_LIVE_BEDROCK=1 npx vitest run …
+ * Deliberate live runs are opt-in and follow the repo's existing live-gate
+ * convention (tests/historian-eval/*.gate.test.ts use
+ * `it.skipIf(!process.env.HISTORIAN_EVAL_LIVE)`):
+ *   HISTORIAN_EVAL_LIVE=1 AWS_PROFILE=sevaro-sandbox npx vitest run tests/historian-eval/<x>.gate.test.ts
+ *   VITEST_ALLOW_LIVE_BEDROCK=1 npx vitest run …      (generic, any other deliberate live run)
  */
 import { afterEach, vi } from 'vitest'
 
 const { guardClient, drainViolations } = vi.hoisted(() => {
-  const allowLive = process.env.VITEST_ALLOW_LIVE_BEDROCK === '1'
+  const allowLive =
+    Boolean(process.env.HISTORIAN_EVAL_LIVE) ||
+    process.env.VITEST_ALLOW_LIVE_BEDROCK === '1'
   const violations: Error[] = []
 
   // Mixin constraint: TS requires `any[]` rest args on a class-expression base,
@@ -40,9 +46,10 @@ const { guardClient, drainViolations } = vi.hoisted(() => {
         const commandName = command?.constructor?.name ?? 'UnknownCommand'
         const error = new Error(
           `${clientName}.send(${commandName}) reached the live AWS SDK inside a vitest run. ` +
-            'Stub the model hook the code under test falls back to (long-packet ' +
-            'pipeline: pass `reduceNarrative`), or vi.mock("@/lib/bedrock"). ' +
-            'Set VITEST_ALLOW_LIVE_BEDROCK=1 only for a deliberate live run.',
+            'Stub the model hook the code under test falls back to (e.g. pass ' +
+            '`reduceNarrative` to runLongPacketModelPipeline) or vi.mock("@/lib/bedrock"). ' +
+            'Deliberate live gates opt in with HISTORIAN_EVAL_LIVE=1 (historian *.gate tests) ' +
+            'or VITEST_ALLOW_LIVE_BEDROCK=1.',
         )
         error.name = 'LiveBedrockInTestError'
         violations.push(error)
