@@ -19,6 +19,20 @@ import {
   type UnresponsivenessMonitor,
 } from '@/lib/voice/unresponsiveness'
 
+const MAX_LOCALIZER_INJECTIONS = 12
+
+// Preserve turn roles and the newest text, including a partial oldest turn.
+function boundLocalizerTranscript(turns: HistorianTranscriptEntry[]) {
+  let remaining = 60_000
+  const bounded: Array<{ role: 'user' | 'assistant'; text: string }> = []
+  for (let i = turns.length - 1; i >= 0 && remaining > 0; i--) {
+    const text = turns[i].text.slice(-remaining)
+    bounded.push({ role: turns[i].role, text })
+    remaining -= text.length
+  }
+  return bounded.reverse()
+}
+
 type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 'error' | 'safety_escalation'
 
 interface UseRealtimeSessionOptions {
@@ -117,6 +131,7 @@ interface UseRealtimeSessionResult {
     suggested_next_question?: string | null
     suggested_scale_id?: string | null
     turn_count?: number
+    attending_gaps?: string[]
   }) => void
   /** Set of scale IDs that have been completed in this session */
   administeredScaleIds: Set<string>
@@ -198,6 +213,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
+  const localizerPushCountRef = useRef(0)
+  const localizerCycleRef = useRef(0)
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
@@ -414,10 +431,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       suggested_next_question?: string | null
       suggested_scale_id?: string | null
       turn_count?: number
+      attending_gaps?: string[]
     }) => {
       const provider = providerRef.current
       if (!provider) return
 
+      const attendingLines = pushPayload.attending_gaps?.[0]
+        ? [`- Attending review — the single most important unasked question is: "${pushPayload.attending_gaps[0]}". Ask it in your own words as your next question unless the patient just raised something urgent.`]
+        : []
       try {
         if (provider.updateInstructions) {
           // OpenAI path — unchanged from before the provider-abstraction refactor.
@@ -426,6 +447,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
             `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
             `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
+            ...attendingLines,
             `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
           ].join('\n')
           const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
@@ -434,13 +456,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Nova path — skip injection if AI is mid-speech to avoid
           // interruption and accidental vocalization of internal context.
           if (isAiSpeakingRef.current) return
+          if (localizerPushCountRef.current >= MAX_LOCALIZER_INJECTIONS) return
           const delta = [
             `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
             `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
             `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
             `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
+            ...attendingLines,
             `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
           ].join('\n')
+          // Count attempts too: a transport error must not allow unbounded retries.
+          localizerPushCountRef.current += 1
           provider.injectSystemText(delta)
         }
       } catch (err) {
@@ -453,6 +479,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
+    const localizerCycle = ++localizerCycleRef.current
     const localizerEnabled = options.enableLocalizer !== false // default true
     if (!localizerEnabled) return
     if (localizerInFlightRef.current) return
@@ -474,6 +501,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         body: JSON.stringify({
           sessionId: options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
+          localizerCycle,
+          safetyEscalated: safetyEscalatedRef.current,
+          fullTranscript: boundLocalizerTranscript(transcriptRef.current),
           transcript: recentTurns.map(t => ({
             ...t,
             timestamp: Date.now(),
@@ -502,7 +532,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         payloadEmpty: !pushPayload || !(
           pushPayload.top_differentials?.some(value => value.trim()) ||
           pushPayload.suggested_next_question?.trim() ||
-          pushPayload.suggested_scale_id?.trim()
+          pushPayload.suggested_scale_id?.trim() ||
+          pushPayload.attending_gaps?.[0]?.trim()
         ),
       }) && pushPayload) {
         pushLocalizerContext(pushPayload)
@@ -1007,6 +1038,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     interviewCompletedRef.current = false
     finalizingRef.current = false
     precloseRejectedRef.current = false
+    localizerPushCountRef.current = 0
+    localizerCycleRef.current = 0
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
     flushTokenRef.current = null

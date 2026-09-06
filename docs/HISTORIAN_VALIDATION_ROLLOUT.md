@@ -108,3 +108,25 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - This is substring coverage, not proof of complete answers or clinical validation; no LLM or database is used by the check.
 
 The hook owns the unified localizer channel: `runLocalizer` calls `pushLocalizerContext` once per eligible cycle for every consumer, skipping speech, safety escalation, and empty payloads; the embedded consumer retains its UI/scale handling without forwarding guidance. For pre-close rejection, OpenAI receives the internal note before the tool result triggers its response; Nova receives the tool result first, then the note as the forcing turn. The Nova ordering must be confirmed on a live session. Henry asks each missing item once, accepts declines or unknown answers without re-asking, and then saves again.
+
+### 2026-09-05 attending review (client)
+
+The hook owns the single localizer push channel for every consumer that enables
+the localizer; EmbeddedHistorian only receives panel updates. Each request keeps
+the existing eight-turn transcript and adds a per-session call counter, the
+existing safety-escalation state, and full transcript turns trimmed from the
+oldest end to at most 60,000 text characters. Counters reset at session start.
+
+Both providers privately receive only the first sanitized attending gap as the
+next-question suggestion. Absent/empty gaps leave the delta byte-identical.
+Speaking and safety guards remain in place. Nova is limited to 12 localizer
+injection attempts per session; OpenAI instruction rewrites remain uncapped.
+Safety escalation and pre-close messages use their existing separate paths and
+are not charged against this localizer ceiling. No server flags are changed.
+
+Standalone-channel limitation: `/patient/historian` uses NeurologicHistorian with
+`enableLocalizer: clinicianMirror` (false by default). Hook ownership eliminates
+a dependency on the embedded component, but does not enable localizer calls on
+that patient page. Changing that opt-in is deferred outside this client scope.
+These are source-level guarantees; live voice behavior and clinical acceptance
+require separately authorized validation.

@@ -1138,3 +1138,25 @@ supplied window are not gaps. Truncation can hide previously asked questions.
 
 A2 will consume the optional payload in the client; A1 makes no client changes.
 These are synthetic software checks, not clinical validation or activation.
+
+### 2026-09-05 attending review (client)
+
+The hook owns the single localizer push channel for every consumer that enables
+the localizer; EmbeddedHistorian only receives panel updates. Each request keeps
+the existing eight-turn transcript and adds a per-session call counter, the
+existing safety-escalation state, and full transcript turns trimmed from the
+oldest end to at most 60,000 text characters. Counters reset at session start.
+
+Both providers privately receive only the first sanitized attending gap as the
+next-question suggestion. Absent/empty gaps leave the delta byte-identical.
+Speaking and safety guards remain in place. Nova is limited to 12 localizer
+injection attempts per session; OpenAI instruction rewrites remain uncapped.
+Safety escalation and pre-close messages use their existing separate paths and
+are not charged against this localizer ceiling. No server flags are changed.
+
+Standalone-channel limitation: `/patient/historian` uses NeurologicHistorian with
+`enableLocalizer: clinicianMirror` (false by default). Hook ownership eliminates
+a dependency on the embedded component, but does not enable localizer calls on
+that patient page. Changing that opt-in is deferred outside this client scope.
+These are source-level guarantees; live voice behavior and clinical acceptance
+require separately authorized validation.
