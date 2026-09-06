@@ -8,12 +8,14 @@ const hook = readFileSync('src/hooks/useRealtimeSession.ts', 'utf8')
 const pushSource = hook.slice(hook.indexOf('  const pushLocalizerContext ='), hook.indexOf('  // ── Localizer: fire async'))
 const runSource = hook.slice(hook.indexOf('  const runLocalizer ='), hook.indexOf('  // ── Durable transcript flush (Task 1)'))
 const boundSource = hook.slice(hook.indexOf('function boundLocalizerTranscript'), hook.indexOf('type SessionStatus'))
+// The get_attending_hint branch of handleToolCall, executed against a real ref (not just string-pinned).
+const hintBranch = hook.slice(hook.indexOf('    if (toolName === ATTENDING_HINT_TOOL_NAME) {'), hook.indexOf('    // ── save_interview_output (existing) ──'))
 
 // Execute the actual hook callbacks with ref/provider doubles, without a live
 // microphone, React renderer, server, or paid model call.
 function harness(openai = false, options: { localizerDetail?: boolean; onLocalizerUpdate?: ReturnType<typeof vi.fn> } = {}) {
-  const provider: { updateInstructions?: ReturnType<typeof vi.fn>; injectSystemText: ReturnType<typeof vi.fn> } =
-    openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn() } : { injectSystemText: vi.fn() }
+  const provider: { updateInstructions?: ReturnType<typeof vi.fn>; injectSystemText: ReturnType<typeof vi.fn>; sendToolResult: ReturnType<typeof vi.fn> } =
+    openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn(), sendToolResult: vi.fn() } : { injectSystemText: vi.fn(), sendToolResult: vi.fn() }
   const refs = {
     providerRef: { current: provider }, baseInstructionsRef: { current: 'BASE' },
     isAiSpeakingRef: { current: false }, safetyEscalatedRef: { current: false },
@@ -24,8 +26,8 @@ function harness(openai = false, options: { localizerDetail?: boolean; onLocaliz
     transcriptRef: { current: [{ role: 'user', text: 'old'.repeat(30000) }, { role: 'assistant', text: 'newest' }] },
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
-  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
-  const source = `${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
+  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, ATTENDING_HINT_TOOL_NAME: 'get_attending_hint', setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
+  const source = `${boundSource}\n${pushSource}\n${runSource}\nfunction serveTool(toolName, toolUseId) { const provider = providerRef.current\n${hintBranch}\nreturn 'fell-through' }\nreturn { serveTool, pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
   return { ...callbacks, ...env, provider }
@@ -87,9 +89,24 @@ describe('attending client hook wiring', () => {
     h.pushLocalizerContext({ suggested_next_question: '  Suggested?  ' })
     expect(h.pendingNovaHintRef.current).toBe('Suggested?')
     h.pushLocalizerContext({ top_differentials: ['only names'] })
-    expect(h.pendingNovaHintRef.current).toBe('Suggested?') // no question → keep the unserved one
+    expect(h.pendingNovaHintRef.current).toBeNull() // a cycle with no question clears a stale hint
     expect(pushSource).not.toMatch(/\.injectSystemText\(/)
     expect(pushSource).not.toMatch(/\.injectContext\(/)
+  })
+
+  it('serves the parked hint exactly once through get_attending_hint, then null', async () => {
+    const h = harness()
+    await h.runLocalizer()
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    expect(h.serveTool('save_interview_output', 'tu0')).toBe('fell-through')
+    expect(h.pendingNovaHintRef.current).toBe('First?')
+    expect(h.serveTool('get_attending_hint', 'tu1')).toBeUndefined()
+    expect(h.provider.sendToolResult).toHaveBeenLastCalledWith('tu1', { hint: 'First?' })
+    expect(h.pendingNovaHintRef.current).toBeNull()
+    h.serveTool('get_attending_hint', 'tu2')
+    expect(h.provider.sendToolResult).toHaveBeenLastCalledWith('tu2', { hint: null })
+    expect(h.provider.sendToolResult).toHaveBeenCalledTimes(2)
+    expect(h.provider.injectSystemText).not.toHaveBeenCalled()
   })
 
   it('adds exactly the first gap line to the OpenAI delta and preserves legacy bytes when absent or empty', () => {
