@@ -244,11 +244,22 @@ export interface RedFlagResult {
 //     ("CT shows no hemorrhage" matched the acute_emergency bank verbatim).
 // ---------------------------------------------------------------------------
 
-const SUBACUTE_TIMEFRAME =
-  /\b(?:(?:two|three|four|five|six|seven|eight|nine|ten|[2-9]|\d{2,})\s+(?:days?|weeks?|months?)\s+(?:ago|of|prior))\b|\b(?:for|over)\s+the\s+(?:last|past)\s+(?:two|three|four|five|six|seven|eight|nine|ten|[2-9]|\d{2,})\s+(?:days?|weeks?|months?)\b|\blast\s+(?:week|month)\b|\b(?:weeks?|months?)\s+ago\b/i
+// Generic multi-day DURATION token (2026-09-06, Steve's live Clara call; twin
+// of sevaro-voice-agent redFlagGate.ts): "two days", "2 days", "two-day",
+// "2-day history", "x 2 days", "times two days", "for three days", "three
+// weeks". One token, not a phrase list — the word AFTER number+unit is
+// deliberately unconstrained. Excludes "a day"/"one day"/"1 day" and never
+// matches hour-scale phrasing (hours live in ACUTE_STROKE_OVERRIDE).
+const MULTI_DAY_DURATION_SRC =
+  '(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|[2-9]|\\d{2,3})[\\s-]*(?:days?|weeks?|months?)'
+
+const SUBACUTE_TIMEFRAME = new RegExp(
+  `\\b${MULTI_DAY_DURATION_SRC}\\b|\\blast\\s+(?:week|month)\\b|\\b(?:weeks?|months?)\\s+ago\\b`,
+  'i',
+)
 
 const ACUTE_STROKE_OVERRIDE =
-  /\b(?:code\s+stroke|stroke\s+alert|just\s+now|right\s+now|this\s+morning|today|tonight|(?:an?\s+|\d+\s+|few\s+)?(?:hour|minute)s?\s+ago|within\s+the\s+(?:last|past)\s+(?:hour|day|\d+\s+hours?|twenty[\s-]?four)|sudden(?:ly)?|acute(?:ly)?|(?:getting|got|becoming)\s+worse|worse(?:ning)?|progress(?:ing|ive)|deteriorat\w*|new\s+(?:deficit|symptom|weakness|onset)|woke\s+up\s+with|wake[\s-]?up\s+stroke|still\s+(?:seizing|unresponsive)|t\s*p\s*a|tnk|thrombolytic|thrombolysis|thrombectomy)\b/i
+  /\b(?:code\s+stroke|stroke\s+alert|just\s+now|right\s+now|this\s+morning|today|tonight|(?:an?\s+|\d+\s+|few\s+)?(?:hour|minute)s?\s+ago|(?:within|in)\s+the\s+(?:last|past)\s+(?:(?:[a-z]+|\d+)\s+)?(?:hours?|days?|twenty[\s-]?four)|sudden(?:ly)?|acute(?:ly)?|(?:getting|got|becoming)\s+worse|worse(?:ning)?|progress(?:ing|ive)|deteriorat\w*|new\s+(?:deficit|symptom|weakness|onset)|woke\s+up\s+with|wake[\s-]?up\s+stroke|still\s+(?:seizing|unresponsive)|t\s*p\s*a|tnk|thrombolytic|thrombolysis|thrombectomy)\b/i
 
 /** Negated imaging findings ("no hemorrhage", "without bleeding") — routine
  *  radiology-speak that must not count as an acute-emergency hit. */
@@ -305,7 +316,7 @@ const STROKE_CONTEXT =
 
 /** Uncertainty/hedging about WHEN it started → not a confident onset → keep EMERGENT. */
 const GUARD_UNCERTAINTY =
-  /\b(?:not\s+sure|unsure|not\s+(?:totally|entirely|really)\s+sure|hard\s+to\s+say|hard\s+to\s+tell|(?:i|he|she|they|we|patient|family|husband|wife|son|daughter|mother|father|mom|dad)\s+thinks?|i\s+want\s+to\s+say|maybe|roughly|sometime|somewhere\s+around|around\b|[a-z]+-ish\b|poor\s+historian|isn'?t\s+sure|aren'?t\s+sure|not\s+certain|uncertain|unclear|unknown|don'?t\s+know|can'?t\s+say|guessing|approximately|give\s+or\s+take)\b/i
+  /\b(?:not\s+sure|unsure|not\s+(?:totally|entirely|really)\s+sure|hard\s+to\s+say|hard\s+to\s+tell|(?:i|he|she|they|we|patient|family|husband|wife|son|daughter|mother|father|mom|dad)\s+thinks?|i\s+want\s+to\s+say|maybe|roughly|sometime|somewhere\s+around|around\b|[a-z]+-ish\b|poor\s+historian|isn'?t\s+sure|aren'?t\s+sure|not\s+certain|uncertain|unclear|unknown|don'?t\s+know|can'?t\s+say|guessing|approximately|give\s+or\s+take|(?:within|in)\s+the\s+(?:last|past)\s+(?:[a-z0-9]+\s+)?(?:days?|hours?))\b/i
 /** Fluctuating / relapsing course → active process → keep EMERGENT. */
 const GUARD_FLUCTUATION =
   /\b(?:comes?\s+and\s+goes?|on\s+and\s+off|on-and-off|intermittent\w*|waxing|waning|back\s+again|came?\s+back|returned|relaps\w*)\b/i
@@ -317,8 +328,10 @@ const GUARD_WORSENING =
   /\b(?:worse|worsen\w*|worsened|progress\w*|spread\w*|deteriorat\w*|declin\w*|getting\s+bad|new\s+(?:deficit|weakness|numbness|symptom|onset))\b/i
 
 /** CONFIDENT, unambiguous > 24 h onset (≥ 2 days / weeks / months, or a named day/week). Required to permit a downgrade. */
-const CONFIDENT_OVER_24H =
-  /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,3})\s+(?:days?|weeks?|months?)\s+ago\b|\b(?:since|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b|\ba\s+(?:week|month)\s+ago\b|\b(?:weeks?|months?)\s+ago\b/i
+const CONFIDENT_OVER_24H = new RegExp(
+  `\\b${MULTI_DAY_DURATION_SRC}\\b|\\b(?:since|last)\\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\\b|\\ba\\s+(?:week|month)\\s+ago\\b|\\b(?:weeks?|months?)\\s+ago\\b`,
+  'i',
+)
 /** Recognized NON-STROKE STAT conditions (GBS/MG/cord/meningitis = STAT 1; MS = STAT 2).
  *  When the caller names one of these, the case is not a downgraded stroke — the guard stands down.
  *  Kept specific (named syndromes, not bare "ms"/"mg") so a real stroke never matches. */

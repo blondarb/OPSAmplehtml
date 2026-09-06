@@ -228,6 +228,14 @@ describe('isSubacuteStrokeReport — defers (rulebook decides the tier)', () => 
     'slurred speech and right sided weakness for the past three days, stable since admission',
     'facial droop noticed two days ago, last known well three days prior, ct without hemorrhage',
     'weak arm since last week, no changes, family asking about follow-up',
+    // 2026-09-06 (Steve's live Clara call): "N-day history of", "for N days",
+    // "x N days", "times N days" are the same explicit >=2-day statement.
+    'i have a patient with a two day history of left sided weakness',
+    'two-day history of left side weakness',
+    'left sided weakness for two days',
+    'left side weakness x 2 days',
+    'weakness on the left side times two days',
+    'three-day history of slurred speech and right arm weakness',
   ]
 
   it.each(cases)('defers on explicitly multi-day presentation: %s', (text) => {
@@ -245,6 +253,14 @@ describe('isSubacuteStrokeReport — keeps the floor (must NOT defer)', () => {
     'slurred speech that started about thirty minutes ago',
     // "Yesterday" is ambiguous (<48h) — stays gated.
     'slurred speech since yesterday',
+    // One-day / 24-48 h phrasing stays inside the window ambiguity — gated.
+    'a one day history of left sided weakness',
+    'left sided weakness for 1 day',
+    'left sided weakness for the last 24 hours',
+    'right sided weakness for 36 hours',
+    // "within/in the last N days" is a WINDOW, not an onset — could be an hour ago.
+    'left sided weakness within the last two days',
+    'weakness in the past 2 days',
     // Multi-day frame BUT acute/worsening language present.
     'two days of right sided weakness but suddenly worse today',
     'weakness for three days and now progressing with new deficit',
@@ -287,12 +303,16 @@ describe('evaluateStrokeDowngradeGuard', () => {
     expect(veto('he woke up this morning with weakness, felt off a couple days ago')).toBe(true) // wake-up
     expect(veto('weakness two or three days ago but this morning it clearly got worse')).toBe(true) // worsening
     expect(veto('numbness for a couple days')).toBe(true) // no confident+stable >24h stated
+    expect(veto('left sided weakness within the last two days, stable')).toBe(true) // window, not an onset (2026-09-06)
+    expect(veto('one day history of left sided weakness, stable')).toBe(true) // 1-day stays gated
   })
 
   it('PERMITS a clean, confident, stable >24h downgrade (no over-triage of real subacute)', () => {
     expect(veto('symptoms started two days ago, right sided weakness stable no change since')).toBe(false)
     expect(veto('stroke consult, three days ago, completely stable, no changes since')).toBe(false)
     expect(veto('witnessed onset one week ago, deficit unchanged, follow up')).toBe(false)
+    expect(veto('two-day history of left sided weakness, stable since it started')).toBe(false) // Steve's phrasing 2026-09-06
+    expect(veto('left arm weakness for three days, unchanged')).toBe(false)
   })
 
   it('NEVER touches other consult types or an already-emergent result', () => {
