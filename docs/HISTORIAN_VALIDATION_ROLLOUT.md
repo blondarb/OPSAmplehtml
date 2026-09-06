@@ -106,3 +106,13 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - Rollback: unset the Amplify env var and redeploy to restore the inline chain; already queued work still completes.
 - Missing column (42703) or unavailable RDS can prevent any marker from being stored; logged persistence failure is not a successful evaluation.
 - Deferred Findings: legacy evaluator log sanitization, other consumers' lifecycle typing/display, and dedicated queue alarms/recovery beyond this contract remain follow-ups.
+## Pre-close coverage beta (2026-09-05)
+- `NEXT_PUBLIC_HISTORIAN_PRECLOSE_GATE` defaults OFF; literal `true` at build time enables the beta.
+- Before the first save, a deterministic server check finds up to three missing topics, critical rubric gaps first.
+- Medications, dose/start details, alcohol, family history, and social/occupation require assistant-turn hints; rubric criticals use all turns.
+- Henry receives one internal request to ask the missing topics, one question at a time, then save again.
+- The second save after rejection and any safety-escalated save finalize without a coverage request.
+- Errors, non-200 responses, and the 2500 ms timeout fail open so infrastructure cannot block saving.
+- This is substring coverage, not proof of complete answers or clinical validation; no LLM or database is used by the check.
+
+The hook owns the unified localizer channel: `runLocalizer` calls `pushLocalizerContext` once per eligible cycle for every consumer, skipping speech, safety escalation, and empty payloads; the embedded consumer retains its UI/scale handling without forwarding guidance. For pre-close rejection, OpenAI receives the internal note before the tool result triggers its response; Nova receives the tool result first, then the note as the forcing turn. The Nova ordering must be confirmed on a live session. Henry asks each missing item once, accepts declines or unknown answers without re-asking, and then saves again.
