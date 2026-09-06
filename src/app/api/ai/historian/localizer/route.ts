@@ -30,6 +30,8 @@ import type {
   AttendingMeta,
   LocalizerPushPayload,
   LocalizerRequest,
+  LocalizerDetailInput,
+  LocalizerDetailRequest,
   LocalizerResponse,
   ExtractedSymptoms,
   GeneratedQuestions,
@@ -41,10 +43,11 @@ import type {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const LOCALIZER_TIMEOUT_MS = 15000
+const DETAIL_TIMEOUT_MS = 25000
 const ATTENDING_TIMEOUT_MS = 8000
 const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
-const MAX_EXCLUDED = 4
+const MAX_EXCLUDED = 2
 const EXCLUDED_FIELD_MAX_LEN = 200
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
@@ -120,13 +123,13 @@ Rules for followUpQuestions:
 - For follow-up sessions: focus on treatment response, interval change, functional impact.
 
 Rules for differential:
-- List 2–4 candidate diagnoses, most likely first.
+- List 2–3 candidate diagnoses, most likely first.
 - Base likelihood on what the patient has reported — not on general prevalence.
 - If insufficient data to rank, default to medium for all.
 - rationale = evidence FOR (why it's on the list). evidence_against = what argues against it or keeps it from ranking higher; use "" if nothing meaningful argues against it. Do not fabricate contradicting evidence.
 
 Rules for excluded (exclusion reasoning — this is important clinical value):
-- List conditions a neurologist would genuinely consider for THIS presentation but rule out, up to 4.
+- List conditions a neurologist would genuinely consider for THIS presentation but rule out, up to 2.
 - reason = the SPECIFIC absent feature or contradicting evidence that rules it out (e.g. "no thunderclap onset or worst-headache-of-life, making subarachnoid hemorrhage unlikely").
 - Only include conditions actually worth considering here — do not pad with implausible diagnoses. Empty array if nothing meaningful was ruled out.
 - Never state an exclusion as certainty a study would be needed to confirm; frame it as clinical reasoning from the history.
@@ -249,7 +252,7 @@ async function persistLocalizerResults(
   differential: DifferentialEntry[],
   followUpQuestions: string[],
   localizationHypothesis: string,
-  kbSources: string[],
+  kbSources: string[] | undefined,
   excluded: ExcludedDiagnosis[]
 ): Promise<void> {
   try {
@@ -270,7 +273,7 @@ async function persistLocalizerResults(
         localizer_excluded: JSON.stringify(excluded),
         localizer_questions: JSON.stringify(followUpQuestions),
         localizer_hypothesis: localizationHypothesis,
-        localizer_kb_sources: JSON.stringify(kbSources),
+        ...(kbSources !== undefined ? { localizer_kb_sources: JSON.stringify(kbSources) } : {}),
         localizer_last_run_at: new Date().toISOString(),
         localizer_run_count: (consult.localizer_run_count ?? 0) + 1,
       })
@@ -278,6 +281,69 @@ async function persistLocalizerResults(
   } catch (err) {
     console.error('[localizer] Failed to persist results to neurology_consults:', err)
   }
+}
+
+function isDetailInput(value: unknown): value is LocalizerDetailInput {
+  if (!value || typeof value !== 'object') return false
+  const input = value as Record<string, unknown>
+  if (typeof input.guidelineContext !== 'string' ||
+    !(input.chiefComplaint === null || typeof input.chiefComplaint === 'string') ||
+    !['new_patient', 'follow_up', 'referral_clarification'].includes(input.sessionType as string)) return false
+  if (!input.extractedSymptoms || typeof input.extractedSymptoms !== 'object') return false
+  const symptoms = input.extractedSymptoms as Record<string, unknown>
+  return typeof symptoms.clinicalSummary === 'string' &&
+    ['primarySymptoms', 'location', 'temporalPattern', 'severity', 'associatedFeatures', 'redFlags']
+      .every(key => Array.isArray(symptoms[key]) && symptoms[key].every(item => typeof item === 'string'))
+}
+
+function capDetail(questions: GeneratedQuestions): GeneratedQuestions {
+  return { ...questions, differential: questions.differential.slice(0, 3),
+    excluded: sanitizeExcluded(questions.excluded).slice(0, 2),
+    followUpQuestions: questions.followUpQuestions.slice(0, 3) }
+}
+
+async function runDetail(sessionId: string, input: LocalizerDetailInput): Promise<NextResponse> {
+  const started = Date.now()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DETAIL_TIMEOUT_MS)
+  let questions: GeneratedQuestions | null = null
+  let degradedReason: string | undefined
+  let aborted = false
+  try {
+    const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
+      system: QUESTION_GENERATOR_PROMPT,
+      messages: [{ role: 'user', content: JSON.stringify({ ...input,
+        transcriptSummary: input.extractedSymptoms.clinicalSummary }) }],
+      maxTokens: 900,
+      temperature: 0.3,
+      signal: controller.signal,
+    })
+    controller.signal.throwIfAborted()
+    questions = capDetail(parsed)
+  } catch (err) {
+    aborted = controller.signal.aborted || (err instanceof Error &&
+      (err.name === 'AbortError' || err.name === 'TimeoutError'))
+    degradedReason = aborted ? 'Differential detail timed out' : 'Question generation failed'
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  const step3b_ms = Date.now() - started
+  if (questions && questions.differential.length > 0) {
+    // Detail has no citation metadata; preserve the sources already stored by steer.
+    void persistLocalizerResults(sessionId, questions.differential, questions.followUpQuestions,
+      questions.localizationHypothesis, undefined, sanitizeExcluded(questions.excluded))
+  }
+  console.info(JSON.stringify({ event: 'localizer_timing', mode: 'detail', sessionId,
+    step3b_ms, total_ms: Date.now() - started, partial: Boolean(degradedReason), aborted }))
+  return NextResponse.json({
+    differential: questions?.differential ?? [],
+    excluded: sanitizeExcluded(questions?.excluded),
+    followUpQuestions: questions?.followUpQuestions ?? [],
+    localizationHypothesis: questions?.localizationHypothesis ?? '',
+    suggestedActions: sanitizeSuggestedActions(questions?.suggested_actions),
+    confidence: questions?.confidence ?? 'low',
+    partial: Boolean(degradedReason), degradedReason, processingMs: Date.now() - started,
+  })
 }
 
 // ── Route Handler ─────────────────────────────────────────────────────────────
@@ -302,18 +368,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
   function logTiming(sessionId: string, partial: boolean) {
-    console.info(JSON.stringify({ event: 'localizer_timing', sessionId, ...timing,
+    console.info(JSON.stringify({ event: 'localizer_timing', mode, sessionId, ...timing,
       total_ms: Date.now() - startMs, partial, aborted }))
   }
 
   // ── Parse and validate request ───────────────────────────────────────────
-  let body: LocalizerRequest
+  let parsedBody: LocalizerRequest | LocalizerDetailRequest
   try {
-    body = await req.json()
+    parsedBody = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
+  if (!parsedBody || typeof parsedBody !== 'object') {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const mode = parsedBody.mode ?? 'full'
+  if (!['full', 'steer', 'detail'].includes(mode)) {
+    return NextResponse.json({ error: 'Invalid localizer mode' }, { status: 400 })
+  }
+  if (parsedBody.mode === 'detail') {
+    if (typeof parsedBody.sessionId !== 'string' || !parsedBody.sessionId.trim() || !isDetailInput(parsedBody.detail_input)) {
+      return NextResponse.json({ error: 'sessionId and valid detail_input are required' }, { status: 400 })
+    }
+    return runDetail(parsedBody.sessionId, parsedBody.detail_input)
+  }
+  const body = parsedBody
   const { sessionId, sessionType, transcript, chiefComplaint, referralReason } = body
 
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
@@ -517,9 +597,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             // A successful detail call preserves the existing response, even if steer fails.
             if (err instanceof Error && err.name === 'AbortError') aborted.push('step3a')
             console.warn('[localizer] Step 3a (steer generation) failed')
+            if (mode === 'steer') degradedReason = degradedReason ?? 'Steer generation failed'
           }
         }).catch(err => { step3Error = err }),
-        timed('step3b_ms', async () => {
+        mode === 'steer' ? Promise.resolve() : timed('step3b_ms', async () => {
           try {
             const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
               system: QUESTION_GENERATOR_PROMPT,
@@ -529,7 +610,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               temperature: 0.3,
               signal,
             })
-            questions = parsed
+            questions = capDetail(parsed)
             detailFinished = true
           } catch (err) {
             if (signal.aborted) throw err
@@ -568,11 +649,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       differential: completedSteer.differential.map(d => ({ ...d, icd10: '', rationale: '', evidence_against: '' })),
       excluded: [], contextHint: '', confidence: 'low', suggested_actions: [],
     }
-    degradedReason = signal.aborted || aborted.includes('step3b')
+    if (mode !== 'steer') degradedReason = signal.aborted || aborted.includes('step3b')
       ? 'Differential detail timed out' : degradedReason ?? 'Question generation failed'
   }
   if (!attendingMeta?.ran) timing.attending_ms = null
   if (attendingMeta?.reason === 'timeout') aborted.push('attending')
+
+  if (mode === 'steer' && attendingMeta?.ran &&
+    (attendingMeta.reason === 'timeout' || attendingMeta.reason === 'error')) {
+    degradedReason = degradedReason ?? 'Attending review failed'
+  }
 
   // ── Persist to DB (fire-and-forget, non-fatal) ───────────────────────────
   if (questions && questions.differential.length > 0) {
@@ -626,6 +712,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     ...response,
+    ...(mode === 'steer' && symptoms ? { detail_input: {
+      extractedSymptoms: symptoms,
+      guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
+      chiefComplaint: chiefComplaint ?? null, sessionType,
+    } } : {}),
     ...(attendingGaps !== undefined ? { attending_gaps: attendingGaps } : {}),
     ...(attendingMeta ? { attending_meta: attendingMeta } : {}),
     push_payload: pushPayload,

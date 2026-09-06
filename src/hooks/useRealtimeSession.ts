@@ -59,6 +59,8 @@ interface UseRealtimeSessionOptions {
    * Set to false to disable entirely for testing or lightweight sessions.
    */
   enableLocalizer?: boolean
+  /** Fetch clinician detail separately after the live steer (default false). */
+  localizerDetail?: boolean
   /** Called when a new localizer result arrives. */
   onLocalizerUpdate?: (data: LocalizerResponse) => void
   /** Called when red flags are detected in patient speech. */
@@ -324,6 +326,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
   const localizerInFlightRef = useRef<boolean>(false)
+  const localizerAbortRef = useRef<AbortController | null>(null)
+  const detailInFlightRef = useRef<AbortController | null>(null)
+  const localizerDataRef = useRef<LocalizerResponse | null>(null)
+  const localizerResultCycleRef = useRef(0)
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -342,6 +348,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [options])
 
   const cleanup = useCallback(() => {
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
     // Stop the duration timer + auto-end timer. Transport teardown is owned
     // by the provider (provider.stop()), invoked from endSession / unmount —
     // NOT here, mirroring the pre-refactor split between React-side cleanup
@@ -480,13 +488,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
     const localizerEnabled = options.enableLocalizer !== false // default true
-    if (!localizerEnabled) return
+    if (!localizerEnabled || finalizingRef.current) return
     if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
 
     localizerInFlightRef.current = true
     // Count SENT requests only, so a call swallowed by the in-flight guard never consumes a cycle number.
     const localizerCycle = ++localizerCycleRef.current
+    const sessionGen = sessionGenRef.current
+    const controller = new AbortController()
+    localizerAbortRef.current = controller
     setLocalizerLoading(true)
 
     // Grab last 8 turns for context
@@ -498,8 +509,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     try {
       const res = await fetch('/api/ai/historian/localizer', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mode: 'steer',
           sessionId: options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
           localizerCycle,
@@ -522,9 +535,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       const data: LocalizerResponse & { push_payload?: Parameters<typeof pushLocalizerContext>[0] } = await res.json()
 
-      // Update state for physician panel
-      setLocalizerData(data)
-      options.onLocalizerUpdate?.(data)
+      if (controller.signal.aborted || finalizingRef.current || sessionGen !== sessionGenRef.current) return
+      localizerResultCycleRef.current = localizerCycle
+      const { detail_input, ...steerData } = data
+      // Transport-only detail_input must never enter panel state or callbacks.
+      localizerDataRef.current = steerData
+      setLocalizerData(steerData)
+      options.onLocalizerUpdate?.(steerData)
 
       const pushPayload = data.push_payload
       if (shouldPushLocalizer({
@@ -539,12 +556,52 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }) && pushPayload) {
         pushLocalizerContext(pushPayload)
       }
+
+      if (options.localizerDetail && detail_input) {
+        // A newer steer supersedes any older detail request.
+        detailInFlightRef.current?.abort()
+        const detailController = new AbortController()
+        detailInFlightRef.current = detailController
+        void (async () => {
+          try {
+            const detailRes = await fetch('/api/ai/historian/localizer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: detailController.signal,
+              body: JSON.stringify({ mode: 'detail', sessionId: options.consultId ?? 'ephemeral', detail_input }),
+            })
+            if (!detailRes.ok) return
+            const detail: LocalizerResponse = await detailRes.json()
+            if (detailController.signal.aborted || finalizingRef.current ||
+              sessionGen !== sessionGenRef.current || localizerCycle !== localizerResultCycleRef.current ||
+              !localizerDataRef.current || detail.partial) return
+            // Explicit allowlist: detail can only update clinician fields, never the push.
+            const merged: LocalizerResponse = { ...localizerDataRef.current,
+              differential: detail.differential, excluded: detail.excluded,
+              followUpQuestions: detail.followUpQuestions,
+              localizationHypothesis: detail.localizationHypothesis,
+              suggestedActions: detail.suggestedActions, confidence: detail.confidence,
+              partial: detail.partial, degradedReason: detail.degradedReason, processingMs: detail.processingMs,
+            }
+            localizerDataRef.current = merged
+            setLocalizerData(merged)
+            options.onLocalizerUpdate?.(merged)
+          } catch {
+            // Non-fatal; retain the completed steer on detail failure.
+          } finally {
+            if (detailInFlightRef.current === detailController) detailInFlightRef.current = null
+          }
+        })()
+      }
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
       console.warn('[localizer] run failed (session continues):', err?.message)
     } finally {
-      localizerInFlightRef.current = false
-      setLocalizerLoading(false)
+      if (localizerAbortRef.current === controller) {
+        localizerAbortRef.current = null
+        localizerInFlightRef.current = false
+        if (!controller.signal.aborted) setLocalizerLoading(false)
+      }
     }
   }, [options, pushLocalizerContext])
 
@@ -1022,6 +1079,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setTranscript([])
     setCurrentAssistantText('')
     setCurrentUserText('')
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
+    localizerAbortRef.current = null
+    detailInFlightRef.current = null
+    localizerDataRef.current = null
     setLocalizerData(null)
     transcriptRef.current = []
     questionCountRef.current = 0
@@ -1182,6 +1244,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const endSession = useCallback(async () => {
     if (finalizingRef.current) return
     finalizingRef.current = true
+    localizerAbortRef.current?.abort()
+    detailInFlightRef.current?.abort()
     setStatus('ending')
 
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000)

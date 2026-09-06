@@ -9,8 +9,13 @@ vi.mock('@/lib/db-query', () => ({ from: vi.fn(() => ({
   update: mocks.persist.mockImplementation(() => ({ eq: async () => ({}) })),
 })) }))
 vi.mock('@/lib/consult/planEvidence', () => ({ retrievePlanEvidence: vi.fn().mockResolvedValue({ guidelineText: 'Synthetic guideline', citations: ['Synthetic source'] }) }))
+import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { POST } from '@/app/api/ai/historian/localizer/route'
 
+const symptoms = { primarySymptoms: ['Synthetic symptom'], redFlags: [], clinicalSummary: 'Synthetic summary',
+  location: [], temporalPattern: [], severity: [], associatedFeatures: [] }
+const detailInput = { extractedSymptoms: symptoms, guidelineContext: 'Synthetic guideline',
+  chiefComplaint: null, sessionType: 'new_patient' }
 const steer = {
   followUpQuestions: ['What makes the synthetic sensation better?'],
   localizationHypothesis: 'Synthetic compact localization',
@@ -25,9 +30,9 @@ const detail = {
   contextHint: 'Synthetic context', confidence: 'medium',
   suggested_actions: [{ action: 'Synthetic action', rationale: 'Synthetic rationale', source: 'Synthetic source' }],
 }
-const request = () => new NextRequest('http://localhost/api/ai/historian/localizer', {
+const request = (overrides: Record<string, unknown> = {}) => new NextRequest('http://localhost/api/ai/historian/localizer', {
   method: 'POST', body: JSON.stringify({ sessionId: 'synthetic-session', sessionType: 'new_patient',
-    transcript: [{ role: 'user', text: 'Synthetic history', timestamp: 0 }] }),
+    transcript: [{ role: 'user', text: 'Synthetic history', timestamp: 0 }], ...overrides }),
 })
 const abortError = () => new DOMException('Synthetic abort', 'AbortError')
 const waitFor = <T>(ms: number, value: T) => new Promise<T>(resolve => setTimeout(() => resolve(value), ms))
@@ -39,7 +44,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   mocks.persist.mockClear()
   mocks.invoke.mockReset().mockImplementation(async opts => ({ parsed: opts.maxTokens === 500
-    ? { primarySymptoms: ['Synthetic symptom'], redFlags: [], clinicalSummary: 'Synthetic summary' }
+    ? symptoms
     : opts.maxTokens === 300 ? steer : detail }))
 })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.useRealTimers() })
@@ -93,7 +98,7 @@ it('emits exactly one content-free JSON timing line with the complete key set', 
   await POST(request())
   expect(info).toHaveBeenCalledTimes(1)
   const line = info.mock.calls[0][0]
-  expect(JSON.parse(line)).toEqual({ event: 'localizer_timing', sessionId: 'synthetic-session',
+  expect(JSON.parse(line)).toEqual({ event: 'localizer_timing', mode: 'full', sessionId: 'synthetic-session',
     step1_ms: 0, step2_ms: 0, step3a_ms: 0, step3b_ms: 0, attending_ms: null, total_ms: 0, partial: false, aborted: [] })
   for (const value of [...steer.followUpQuestions, ...detail.followUpQuestions,
     steer.differential[0].diagnosis, detail.differential[0].diagnosis, detail.excluded[0].diagnosis]) expect(line).not.toContain(value)
@@ -134,4 +139,87 @@ it('drops a steer question that names a diagnosis before it can reach Henry', as
   const body = await (await POST(request())).json()
   expect(body.push_payload.suggested_next_question).toBe(steer.followUpQuestions[0])
   expect(body.followUpQuestions).toEqual([steer.followUpQuestions[0]])
+})
+
+
+it.each([false, true])('steer skips detail and returns transport inputs, attending gated = %s', async attending => {
+  vi.stubEnv('HISTORIAN_ATTENDING_ENABLED', String(attending))
+  vi.stubEnv('HISTORIAN_ATTENDING_INTERVAL', '1')
+  const response = await POST(request({ mode: 'steer', localizerCycle: 1,
+    fullTranscript: Array.from({ length: 6 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: 'Synthetic turn' })) }))
+  const body = await response.json()
+  expect(body).toMatchObject({ partial: false, detail_input: detailInput, excluded: [],
+    push_payload: { top_differentials: [steer.differential[0].diagnosis] } })
+  expect(body.degradedReason).toBeUndefined()
+  expect(mocks.invoke.mock.calls.map(([opts]) => opts.maxTokens)).toEqual(attending ? [500, 300, 900] : [500, 300])
+  expect(mocks.invoke.mock.calls.some(([opts]) => opts.system.includes('Rules for differential:'))).toBe(false)
+  if (attending) expect(body.attending_meta.ran).toBe(true)
+})
+
+it('detail alone succeeds after 16 seconds with a distinct 25-second signal and no live payload', async () => {
+  await POST(request({ mode: 'steer' }))
+  const steerSignal = mocks.invoke.mock.calls[0][0].signal
+  mocks.invoke.mockClear()
+  vi.mocked(retrievePlanEvidence).mockClear()
+  mocks.persist.mockClear()
+  info.mockClear()
+  mocks.invoke.mockImplementation(opts => waitFor(16000, { parsed: detail }).then(value => {
+    opts.signal.throwIfAborted()
+    return value
+  }))
+  const pending = POST(request({ mode: 'detail', transcript: undefined, detail_input: detailInput }))
+  await vi.advanceTimersByTimeAsync(16000)
+  const body = await (await pending).json()
+  expect(body).toMatchObject({ differential: detail.differential, partial: false, processingMs: 16000 })
+  expect(mocks.invoke).toHaveBeenCalledTimes(1)
+  const opts = mocks.invoke.mock.calls[0][0]
+  expect(opts).toMatchObject({ maxTokens: 900, temperature: 0.3 })
+  expect(opts.signal).not.toBe(steerSignal)
+  expect(opts.signal.aborted).toBe(false)
+  expect(vi.mocked(retrievePlanEvidence)).not.toHaveBeenCalled()
+  expect(mocks.persist.mock.calls[0][0]).not.toHaveProperty('localizer_kb_sources')
+  expect(JSON.parse(opts.messages[0].content)).toEqual({ ...detailInput, transcriptSummary: symptoms.clinicalSummary })
+  expect(Object.keys(body).some(key => key === 'push_payload' || key.startsWith('attending_'))).toBe(false)
+  expect(JSON.parse(mocks.persist.mock.calls[0][0].localizer_differential)).toEqual(detail.differential)
+  expect(JSON.parse(info.mock.calls[0][0])).toEqual({ event: 'localizer_timing', mode: 'detail', sessionId: 'synthetic-session',
+    step3b_ms: 16000, total_ms: 16000, partial: false, aborted: false })
+  for (const value of [symptoms.clinicalSummary, ...symptoms.primarySymptoms, detailInput.guidelineContext,
+    ...detail.followUpQuestions, detail.differential[0].diagnosis]) expect(info.mock.calls[0][0]).not.toContain(value)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('detail aborts at 25 seconds and does not persist failed detail', async () => {
+  mocks.invoke.mockImplementation(opts => new Promise((_, reject) =>
+    opts.signal.addEventListener('abort', () => reject(abortError()), { once: true })))
+  const pending = POST(request({ mode: 'detail', detail_input: detailInput }))
+  await vi.advanceTimersByTimeAsync(24999)
+  expect(mocks.invoke.mock.calls[0][0].signal.aborted).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(await (await pending).json()).toMatchObject({ partial: true, degradedReason: 'Differential detail timed out', processingMs: 25000 })
+  expect(mocks.persist).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it.each(['full', 'detail'])('%s caps counts without shortening clinical wording', async mode => {
+  const longText = 'Synthetic clinical reasoning. '.repeat(6).trim()
+  const oversized = { ...detail,
+    differential: Array.from({ length: 5 }, () => ({ ...detail.differential[0], rationale: longText, evidence_against: longText })),
+    excluded: Array.from({ length: 4 }, () => ({ ...detail.excluded[0], reason: longText })),
+    followUpQuestions: Array.from({ length: 5 }, () => detail.followUpQuestions[0]),
+  }
+  const original = mocks.invoke.getMockImplementation()!
+  mocks.invoke.mockImplementation(opts => opts.maxTokens === 900 ? Promise.resolve({ parsed: oversized }) : original(opts))
+  const body = await (await POST(request({ mode, detail_input: detailInput }))).json()
+  expect(body.differential).toEqual(oversized.differential.slice(0, 3))
+  expect(body.excluded).toEqual(oversized.excluded.slice(0, 2))
+  expect(body.followUpQuestions).toEqual(oversized.followUpQuestions.slice(0, 3))
+  expect(JSON.parse(mocks.persist.mock.calls[0][0].localizer_differential)).toHaveLength(3)
+})
+
+it.each([undefined, null, {}, { ...detailInput, extractedSymptoms: {} },
+  { ...detailInput, sessionType: 'bad' }, { ...detailInput, guidelineContext: 3 },
+  { ...detailInput, extractedSymptoms: { ...symptoms, redFlags: [123] } },
+])('rejects missing or invalid detail inputs without model work: %j', async detail_input => {
+  expect((await POST(request({ mode: 'detail', detail_input }))).status).toBe(400)
+  expect(mocks.invoke).not.toHaveBeenCalled()
 })
