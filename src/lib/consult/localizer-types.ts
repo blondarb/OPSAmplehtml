@@ -25,7 +25,23 @@ export interface LocalizerTranscriptTurn {
  * session. The request is non-blocking — if the localizer times out or errors,
  * the historian session continues unaffected.
  */
+export interface LocalizerDetailInput {
+  extractedSymptoms: ExtractedSymptoms
+  guidelineContext: string
+  chiefComplaint: string | null
+  sessionType: LocalizerRequest['sessionType']
+}
+
+export interface LocalizerDetailRequest {
+  mode: 'detail'
+  sessionId: string
+  detail_input: LocalizerDetailInput
+}
+
 export interface LocalizerRequest {
+  mode?: 'full' | 'steer'
+  /** Steer mode only: ask for detail_input so this client can make the follow-up detail call (clinician mirror). */
+  wantDetail?: boolean
   fullTranscript?: Array<{ role: 'user' | 'assistant'; text: string }>
   localizerCycle?: number
   safetyEscalated?: boolean
@@ -120,7 +136,7 @@ export interface SuggestedAction {
 export interface GeneratedQuestions {
   /** 2–3 specific follow-up questions tailored to the symptoms and KB evidence. */
   followUpQuestions: string[]
-  /** Ranked differential diagnoses (2–4 candidates). */
+  /** Ranked differential diagnoses (2–3 candidates). */
   differential: DifferentialEntry[]
   /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
   excluded?: ExcludedDiagnosis[]
@@ -169,10 +185,11 @@ export interface LocalizerPushPayload {
 }
 
 export interface LocalizerResponse {
+  detail_input?: LocalizerDetailInput
   push_payload?: LocalizerPushPayload
   attending_gaps?: string[]
   attending_meta?: AttendingMeta
-  /** 2–4 candidate diagnoses, ranked by likelihood. */
+  /** 2–3 candidate diagnoses, ranked by likelihood. */
   differential: DifferentialEntry[]
   /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
   excluded?: ExcludedDiagnosis[]

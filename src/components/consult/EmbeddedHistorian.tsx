@@ -214,6 +214,7 @@ export default function EmbeddedHistorian({
     // explicitly chose one, so the server's VOICE_PROVIDER governs otherwise.
     provider: voiceProviderExplicit ? voiceProvider : undefined,
     enableLocalizer: true,
+    localizerDetail: true,
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
     onLocalizerUpdate: handleLocalizerUpdate,

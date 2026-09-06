@@ -10,21 +10,23 @@ const boundSource = hook.slice(hook.indexOf('function boundLocalizerTranscript')
 
 // Execute the actual hook callbacks with ref/provider doubles, without a live
 // microphone, React renderer, server, or paid model call.
-function harness(openai = false) {
+function harness(openai = false, options: { localizerDetail?: boolean; onLocalizerUpdate?: ReturnType<typeof vi.fn> } = {}) {
   const provider = openai ? { updateInstructions: vi.fn(), injectSystemText: vi.fn() } : { injectSystemText: vi.fn() }
   const refs = {
     providerRef: { current: provider }, baseInstructionsRef: { current: 'BASE' },
     isAiSpeakingRef: { current: false }, safetyEscalatedRef: { current: false },
     localizerPushCountRef: { current: 0 }, localizerCycleRef: { current: 0 },
-    localizerInFlightRef: { current: false },
+    localizerInFlightRef: { current: false }, localizerResultCycleRef: { current: 0 },
+    localizerAbortRef: { current: null }, detailInFlightRef: { current: null },
+    localizerDataRef: { current: null }, finalizingRef: { current: false }, sessionGenRef: { current: 1 },
     transcriptRef: { current: [{ role: 'user', text: 'old'.repeat(30000) }, { role: 'assistant', text: 'newest' }] },
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
-  const env = { ...refs, fetch, options: {}, shouldPushLocalizer, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
+  const env = { ...refs, fetch, options, shouldPushLocalizer, setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
   const source = `const MAX_LOCALIZER_INJECTIONS = 12;\n${boundSource}\n${pushSource}\n${runSource}\nreturn { pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
-  return { ...callbacks, ...refs, provider, fetch }
+  return { ...callbacks, ...env, provider }
 }
 
 describe('attending client hook wiring', () => {
@@ -88,4 +90,80 @@ describe('attending client hook wiring', () => {
       expect(output().indexOf(line)).toBeGreaterThan(output().indexOf('- Suggested'))
     }
   })
+})
+
+
+it('pins off-cycle opt-in, transport-only inputs, and lifecycle cancellation', () => {
+  expect(runSource).toContain("mode: 'steer'")
+  expect(runSource).toContain('wantDetail: options.localizerDetail === true')
+  expect(runSource).toContain('if (options.localizerDetail && detail_input)')
+  expect(runSource).toContain('void (async () =>')
+  expect(runSource).toContain('const { detail_input, ...steerData } = data')
+  expect(runSource).toContain('setLocalizerData(steerData)')
+  expect(runSource).not.toMatch(/setLocalizerData\((?:data|detail|detail_input)\)/)
+  expect(runSource).toContain('localizerCycle !== localizerResultCycleRef.current')
+  expect(hook.slice(hook.indexOf('  const cleanup ='), hook.indexOf('  const cleanup =') + 200)).toContain('detailInFlightRef.current?.abort()')
+  expect(hook.slice(hook.indexOf('  const endSession ='), hook.indexOf('  const endSession =') + 300)).toContain('detailInFlightRef.current?.abort()')
+  expect(readFileSync('src/components/NeurologicHistorian.tsx', 'utf8')).toContain('localizerDetail: clinicianMirror')
+  expect(readFileSync('src/components/consult/EmbeddedHistorian.tsx', 'utf8')).toContain('localizerDetail: true')
+})
+
+const steerResponse = { differential: [{ diagnosis: 'Synthetic steer' }], detail_input: { guidelineContext: 'Synthetic context' },
+  push_payload: { attending_gaps: ['First?'] }, kbSources: ['Synthetic source'] }
+const detailResponse = { differential: [{ diagnosis: 'Synthetic detail', rationale: 'Synthetic rationale' }],
+  excluded: [], followUpQuestions: ['Synthetic detail question?'], partial: false,
+  push_payload: { attending_gaps: ['MUST NEVER INJECT'] }, detail_input: { guidelineContext: 'MUST NEVER STORE' } }
+const response = (data: unknown) => ({ ok: true, json: async () => data })
+const flushDetail = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }
+
+it('pushes before unresolved detail, then merges only clinician fields with a second callback', async () => {
+  const onLocalizerUpdate = vi.fn()
+  const h = harness(false, { localizerDetail: true, onLocalizerUpdate })
+  let resolveDetail!: (value: unknown) => void
+  h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
+  await h.runLocalizer()
+  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
+  expect(JSON.parse(h.fetch.mock.calls[1][1].body)).toMatchObject({ mode: 'detail', detail_input: steerResponse.detail_input })
+  resolveDetail(response(detailResponse))
+  await flushDetail()
+  expect(h.setLocalizerData).toHaveBeenCalledTimes(2)
+  expect(onLocalizerUpdate).toHaveBeenCalledTimes(2)
+  expect(h.localizerDataRef.current).toMatchObject({ differential: detailResponse.differential,
+    push_payload: steerResponse.push_payload, kbSources: steerResponse.kbSources })
+  expect(h.localizerDataRef.current).not.toHaveProperty('detail_input')
+  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
+  expect(h.detailInFlightRef.current).toBeNull()
+})
+
+it('keeps the steer\'s own partial warning when a clean detail merges', async () => {
+  const h = harness(false, { localizerDetail: true })
+  const partialSteer = { ...steerResponse, partial: true, degradedReason: 'Attending review failed' }
+  h.fetch.mockResolvedValueOnce(response(partialSteer)).mockResolvedValueOnce(response({ ...detailResponse, partial: false, degradedReason: null }))
+  await h.runLocalizer()
+  await flushDetail()
+  expect(h.localizerDataRef.current).toMatchObject({ differential: detailResponse.differential, partial: true, degradedReason: 'Attending review failed' })
+})
+
+it('defaults to steer only even when transport inputs are returned', async () => {
+  const h = harness()
+  h.fetch.mockResolvedValue(response(steerResponse))
+  await h.runLocalizer()
+  expect(h.fetch).toHaveBeenCalledTimes(1)
+  expect(h.localizerDataRef.current).not.toHaveProperty('detail_input')
+})
+
+it.each(['newer cycle', 'ended', 'new session', 'aborted', 'failed detail'])('drops late detail after %s', async reason => {
+  const h = harness(false, { localizerDetail: true })
+  let resolveDetail!: (value: unknown) => void
+  h.fetch.mockResolvedValueOnce(response(steerResponse)).mockImplementationOnce(() => new Promise(resolve => { resolveDetail = resolve }))
+  await h.runLocalizer()
+  if (reason === 'newer cycle') h.localizerResultCycleRef.current++
+  if (reason === 'ended') h.finalizingRef.current = true
+  if (reason === 'new session') h.sessionGenRef.current++
+  if (reason === 'aborted') (h.detailInFlightRef.current as AbortController | null)?.abort()
+  resolveDetail(response({ ...detailResponse, partial: reason === 'failed detail' }))
+  await flushDetail()
+  expect(h.setLocalizerData).toHaveBeenCalledTimes(1)
+  expect(h.provider.injectSystemText).toHaveBeenCalledTimes(1)
 })

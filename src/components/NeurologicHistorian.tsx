@@ -234,6 +234,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     // on patient routes when NEXT_PUBLIC_HISTORIAN_PATIENT_STEER is on: its
     // output then goes only to Henry's private steer, never to the screen.
     enableLocalizer: clinicianMirror || PATIENT_STEER_ENABLED,
+    localizerDetail: clinicianMirror,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
