@@ -62,6 +62,8 @@ describe('runs view differential', () => {
       label: 'Post-interview eval',
       summary: finalDifferential.summary,
       excluded: [],
+      dropped_exclusions: 0,
+      exclusion_audit_flags: [],
       entries: finalDifferential.differential.map((item, i) => ({
         diagnosis: item.diagnosis,
         icd10: item.icd10,
@@ -150,4 +152,18 @@ describe('patientLabel', () => {
   it('preserves other unlinked labels', () => {
     expect(patientLabel(makeRun({ patient_name: 'Synthetic custom label' }))).toBe('Synthetic custom label')
   })
+})
+
+it('hides post-interview sections for insufficient records even with legacy gaps', () => {
+  const run = makeRun({ final_differential: { ...finalDifferential, status: 'insufficient_transcript', differential: [], unassessed: ['Fever assessment'] } })
+  expect(resolveDifferentials(run)).toEqual([])
+  expect(render(run)).not.toContain('Post-interview eval')
+  expect(render(run)).not.toContain('Not assessed in this interview')
+})
+it('renders dropped exclusions even when every exclusion was removed, plus audit count', () => {
+  const run = makeRun({ final_differential: { ...finalDifferential, differential: [], excluded: [], dropped_exclusions: 2, exclusion_audit_flags: ['Synthetic'], unassessed: ['When did symptoms start?'] } })
+  const markup = render(run)
+  expect(markup).toContain('2 exclusion(s) dropped')
+  expect(markup).toContain('1 exclusion audit flag(s)')
+  expect(markup).toContain('When did symptoms start?')
 })

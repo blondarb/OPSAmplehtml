@@ -172,3 +172,9 @@ it('labels a pipeline error as failed without raw message text', () => {
   expect(markup).not.toContain('Pipeline differential pending')
   expect(markup).not.toContain('PRIVATE RAW MESSAGE')
 })
+
+it('renders a v2 item confidence limitation on the physician card', () => {
+  const v2 = { ...PIPELINE, provenance: { ...PIPELINE.provenance, prompt_version: 'final-ddx-v2' }, differential: [{ ...PIPELINE.differential[0], confidence_note: 'Fever assessment unknown' }] }
+  const markup = renderToStaticMarkup(<DdxComparisonCard finalDifferential={v2} independentDdx={null} agreement={null} />)
+  expect(markup).toContain('Confidence limited: Fever assessment unknown')
+})

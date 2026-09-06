@@ -8,11 +8,21 @@
 
 Six phases, all code-reviewed (per-task + whole-branch): durable transcript event log + flush endpoint (P1), final full-transcript differential + investigational card (P2), thoroughness judge + fidelity screen + unvetted-rubric system (P3), independent DeepSeek-R1 differential + agreement metrics + **GET /api/ai/historian/save now Cognito-authed** (P4), batch eval harness + QI report + release gates with committed baseline (P5), synthetic patient conversation driver (P6, live gate deferred — see §5).
 
-## Differential record v2 — 2026-09-05
+## Differential records v2/v3 — review fixes 2026-09-06
 
-`final-ddx-v2` adds optional ranked-item `confidence_note`, record-level `excluded`, and deterministic `unassessed` fields; v1 readers remain compatible. See [the differential precision contract](PRD_AI_HISTORIAN.md#2026-09-05-differential-precision-v2) for caps and source-grounding rules. Exclusions require positive evidence, never missing history. Unassessed labels indicate unmatched critical rubric hints, not definitive absence of assessment. Invalid excluded transcript quotes increment the existing `dropped_quotes` count.
+`final-ddx-v3` retains v2's optional confidence notes, exclusions and deterministic gaps, with stricter Patient-only quote verification. See [the precision contract](PRD_AI_HISTORIAN.md#2026-09-06-differential-precision-review-fixes-v3). Every new exclusion requires a verified Patient statement (explicit denial or incompatible finding); Historian questions, silence, and AI-generated structured output alone cannot support it. A listed UNASSESSED topic cannot ground an exclusion. Failed quotes remove the entire exclusion and increment `dropped_quotes` and `dropped_exclusions`; listed-topic/hint conflicts are demoted to a matching ranked item's confidence note or dropped. Never-asked phrasing adds an audit flag on retained exclusions.
 
-The agreement evaluation's persisted `result` now includes `excluded_count` (zero for absent/v1 exclusions), while metric inputs remain the two ranked arrays. This source change does not authorize the historical live/backfill steps below. The v2 identifier is defined in `finalDifferential.ts`; adding it to the shared prompt registry is deferred because that file is outside the A3 scope fence.
+The **runs view renders v2/v3 fields**, including confidence notes, provisional exclusions and unassessed questions; it also renders dropped-exclusion and audit counts. **Physician DifferentialCard and DdxComparisonCard render confidence_note** beneath rationale as “Confidence limited:”. Excluded/unassessed fields do not reach the patient report or note import. A quoted phrase inside a reason is not verified text; only the `evidence_quote` line passed verification. Historical v2 verified any transcript role; v3 verifies Patient turns only.
+
+UNASSESSED is a **non-exhaustive keyword screen**: base criticals without hints never appear, no syndrome match means the section is omitted, and questions can match without an adequate answer. An empty screen is not proof of completeness; confidence notes may name missed gaps. Abandoned insufficient-transcript sessions produce neither gaps nor a post-interview differential section. The prompt prohibits management/testing/referral/treatment recommendations in reasoning fields.
+
+Saved output uses compact whole-field serialization within 6,000 characters, followed by `[omitted fields: …]` when needed. Unshown/partial fields are unknown and never exclusion evidence. Exclusion reason and evidence quote are limited to 300 characters each; inference budget is 6,000 tokens. **Driver must re-run the live gate for v3**; this change does not run or authorize it.
+
+CLI and live agreement rows both use the shared `withExcludedCount` helper for persisted `excluded_count` (zero for absent/v1 exclusions); scoring still sees only ranked arrays. Deferred: shared prompt-registry entry outside the scope fence and driver-run live-gate validation. This source change does not authorize historical live/backfill steps below.
+
+### Review-fix verification
+
+PR #213 review-fix candidate includes main `0086266` (#211 and #212) via merge `f35c587`. Offline checks: `npx tsc --noEmit` passed; `env -u HISTORIAN_EVAL_LIVE npx vitest run --exclude 'tests/simulated-patients/**'` passed (239 files passed, 4 skipped; 3,435 tests passed, 25 skipped). One full Vitest run for this resume. Focused checks cover Patient-only exclusions, dropped-item counts, gap demotion, audit phrases, whole-field serialization, physician cards, abandoned-session display, and CLI/live agreement metadata parity. No Bedrock/AWS API, live gate, or Next build was run. The scoped PRD and this runbook carry the durable handoff under the review-fix file fence.
 
 ## The single approval = these irreversible steps, batched
 

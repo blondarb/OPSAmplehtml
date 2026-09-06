@@ -115,3 +115,9 @@ it('renders error class without raw message', () => {
   expect(markup).not.toContain('PRIVATE RAW MESSAGE')
   expect(markup).not.toMatch(/pending/i)
 })
+
+it('renders a v2 item confidence limitation on the physician card', () => {
+  const v2 = { ...SAMPLE, provenance: { ...SAMPLE.provenance, prompt_version: 'final-ddx-v2' }, differential: [{ ...SAMPLE.differential[0], confidence_note: 'Fever assessment unknown' }] }
+  const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={v2} />)
+  expect(markup).toContain('Confidence limited: Fever assessment unknown')
+})

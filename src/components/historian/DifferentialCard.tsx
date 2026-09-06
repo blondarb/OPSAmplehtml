@@ -133,6 +133,11 @@ function DifferentialItemRow({
         </p>
       )}
 
+      {item.confidence_note && (
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-warning, #92400e)', margin: '4px 0 0' }}>
+          Confidence limited: {item.confidence_note}
+        </p>
+      )}
       <QuoteList label="Supporting evidence" quotes={item.supporting_quotes} onQuoteClick={onQuoteClick} />
       <QuoteList label="Contradicting evidence" quotes={item.contradicting_quotes} onQuoteClick={onQuoteClick} />
     </li>

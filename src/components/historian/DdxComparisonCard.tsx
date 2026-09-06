@@ -108,6 +108,11 @@ function CompactDifferentialItem({
           {item.rationale}
         </p>
       )}
+      {item.confidence_note && (
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-warning, #92400e)', margin: '4px 0 0' }}>
+          Confidence limited: {item.confidence_note}
+        </p>
+      )}
       <QuoteChips quotes={item.supporting_quotes} onQuoteClick={onQuoteClick} />
     </li>
   )
