@@ -817,9 +817,30 @@ function classifyExperiencer(text: string): GatewaySignal['experiencer'] {
   return 'unknown'
 }
 
-function canCombineAdjacent(left: string, right: string): boolean {
-  const leftExperiencer = classifyExperiencer(left)
-  const rightExperiencer = classifyExperiencer(right)
+/**
+ * Experiencer classification depends only on a span's text, but the evaluation
+ * loop asks for it for every rule and every neighbouring pair. Caching it per
+ * scan classifies each sentence once instead of once per rule per pair, which
+ * is what dominated long-packet scans of routine text.
+ */
+type SpanExperiencerCache = Array<GatewaySignal['experiencer'] | undefined>
+
+function spanExperiencer(
+  spans: TextSpan[],
+  cache: SpanExperiencerCache,
+  index: number,
+): GatewaySignal['experiencer'] {
+  const cached = cache[index]
+  if (cached !== undefined) return cached
+  const experiencer = classifyExperiencer(spans[index].text)
+  cache[index] = experiencer
+  return experiencer
+}
+
+function canCombineAdjacent(
+  leftExperiencer: GatewaySignal['experiencer'],
+  rightExperiencer: GatewaySignal['experiencer'],
+): boolean {
   const crossesFamilyContext =
     (leftExperiencer === 'family' && rightExperiencer !== 'family') ||
     (rightExperiencer === 'family' && leftExperiencer !== 'family')
@@ -1124,6 +1145,7 @@ function selectEvaluationSpan(
   spans: TextSpan[],
   index: number,
   rule: SyndromeRule,
+  experiencers: SpanExperiencerCache,
 ): { span: TextSpan; nextContextIndex: number } | null {
   const current = spans[index]
   if (rule.matches(current.text)) {
@@ -1131,7 +1153,15 @@ function selectEvaluationSpan(
   }
 
   const next = spans[index + 1]
-  if (!next || !canCombineAdjacent(current.text, next.text)) return null
+  if (
+    !next ||
+    !canCombineAdjacent(
+      spanExperiencer(spans, experiencers, index),
+      spanExperiencer(spans, experiencers, index + 1),
+    )
+  ) {
+    return null
+  }
 
   const combined: TextSpan = {
     startOffset: current.startOffset,
@@ -1147,7 +1177,15 @@ function selectEvaluationSpan(
   }
 
   const third = spans[index + 2]
-  if (!third || !canCombineAdjacent(next.text, third.text)) return null
+  if (
+    !third ||
+    !canCombineAdjacent(
+      spanExperiencer(spans, experiencers, index + 1),
+      spanExperiencer(spans, experiencers, index + 2),
+    )
+  ) {
+    return null
+  }
 
   const combinedThree: TextSpan = {
     startOffset: current.startOffset,
@@ -1293,10 +1331,17 @@ function runEmergencyGatewayInternal(
     source,
     limits.maxLexicalHits ?? Number.POSITIVE_INFINITY,
   )
+  const experiencers: SpanExperiencerCache = new Array(spans.length)
 
   for (let index = 0; index < spans.length; index += 1) {
     for (const rule of RULES) {
-      const evaluation = selectEvaluationSpan(text, spans, index, rule)
+      const evaluation = selectEvaluationSpan(
+        text,
+        spans,
+        index,
+        rule,
+        experiencers,
+      )
       if (!evaluation) continue
       if (
         isSuppressed(

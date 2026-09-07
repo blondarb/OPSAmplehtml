@@ -12,6 +12,10 @@ import type {
   LongPacketPlan,
 } from './longPacketPlanner'
 import { longPacketChunkProvenanceDigest } from './longPacketPlanner'
+import {
+  hashLongPacketEmergency,
+  hashLongPacketPlan,
+} from './longPacketCanonicalHash'
 
 export const LONG_PACKET_EMERGENCY_VERSION =
   'neurology-long-packet-emergency-map-reduce-v3'
@@ -344,7 +348,37 @@ export function scanLongPacketEmergency(
   plan: LongPacketPlan,
 ): LongPacketEmergencyResult {
   const chunkEvaluations = plan.chunks.map(evaluateChunk)
-  return reduceLongPacketEmergency(plan, chunkEvaluations)
+  const result = reduceLongPacketEmergency(plan, chunkEvaluations)
+  SCAN_RECEIPTS.set(result, scanReceipt(plan, result))
+  return result
+}
+
+/**
+ * Opaque receipts binding a scan result object to the exact plan content it
+ * was computed from and to its own content. Keyed by object identity, so a
+ * persisted, cloned, or hand-built result can never carry a receipt, and a
+ * result mutated after scanning no longer matches its receipt.
+ */
+const SCAN_RECEIPTS = new WeakMap<LongPacketEmergencyResult, string>()
+
+function scanReceipt(
+  plan: LongPacketPlan,
+  result: LongPacketEmergencyResult,
+): string {
+  return `${hashLongPacketPlan(plan)}:${hashLongPacketEmergency(result)}`
+}
+
+/**
+ * True only for the unmodified result object that `scanLongPacketEmergency`
+ * returned for a plan with exactly this content. Lets a validator reuse a
+ * scan it already holds without trusting caller-supplied identifiers.
+ */
+export function isLongPacketEmergencyScanOf(
+  result: LongPacketEmergencyResult,
+  plan: LongPacketPlan,
+): boolean {
+  const receipt = SCAN_RECEIPTS.get(result)
+  return receipt !== undefined && receipt === scanReceipt(plan, result)
 }
 
 const CARE_PATHWAY_SAFETY_RANK: Record<CarePathway, number> = {

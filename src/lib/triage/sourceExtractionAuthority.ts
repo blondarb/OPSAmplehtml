@@ -938,6 +938,7 @@ export function validatePersistedSourceSafetyAuthority(
         longPacketSafety = validatePersistedLongPacketModelSafetyArtifacts({
           sourcePages: envelope.pages,
           packetPlan: envelope.packetPlan,
+          deterministicGateway: envelope.deterministicGateway,
           modelMapResult,
           modelReduceResult,
           safetyPromptVersions,
