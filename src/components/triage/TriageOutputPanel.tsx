@@ -1,5 +1,6 @@
 'use client'
 
+import { clinicalTimingLines } from '@/lib/triage/clinicalTimingPresentation'
 import { useState } from 'react'
 import {
   LOW_CONFIDENCE_DISCLAIMER,
@@ -35,7 +36,6 @@ import EmergencyActionPanel from './EmergencyActionPanel'
 import { hasModelSafetyFailure } from '@/lib/triage/safetyReviewView'
 
 const EMERGENCY_TIMEFRAME = 'Emergency evaluation now'
-const SAME_DAY_TIMEFRAME = 'Same-day clinician review'
 interface Props {
   result: TriageResult
   onTryAnother: () => void
@@ -66,7 +66,7 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
           ]),
         )
   const isEmergent = outputPolicy.timeframe === EMERGENCY_TIMEFRAME
-  const isSameDay = outputPolicy.timeframe === SAME_DAY_TIMEFRAME
+  const isSameDay = outputPolicy.immediateReview
   // Common case (the Gutierrez pattern): triaged with confidence, some
   // items just weren't in the referral, none of them blocked the
   // recommendation. Built only from flags that already gate other
@@ -128,7 +128,7 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
             <h3>Insufficient or undetermined data — human review hold</h3>
             <p style={{ margin: '0 0 6px' }}>
               {isSameDay
-                ? 'Same-day clinician review remains the active action. '
+                ? `${outputPolicy.timeframe}. `
                 : ''}
               Outpatient workup, routing, and final disposition remain blocked
               until a clinician reviews the available source evidence and
@@ -263,6 +263,12 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
               </div>
             )}
 
+            {presentationResult.clinical_timing && (
+              <div className="nn-note" aria-label="Source chronology">
+                <h3>Source chronology</h3>
+                {clinicalTimingLines(presentationResult.clinical_timing).map((line) => <p key={line}>{line}</p>)}
+              </div>
+            )}
             {/* Clinical reasons */}
             <ClinicalReasons reasons={presentationResult.clinical_reasons} />
 
@@ -279,22 +285,7 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
 
             {/* Suggested workup */}
             {outputPolicy.showPreVisitWorkup && (
-              <>
-                {isSameDay && presentationResult.suggested_workup.length > 0 && (
-                  <div
-                    aria-label="Same-day non-blocking workup notice"
-                    className="nn-note"
-                    style={{ margin: 0 }}
-                  >
-                    <h3>Non-blocking workup</h3>
-                    <p style={{ margin: 0 }}>
-                      Any suggested workup is optional before review and must
-                      not delay same-day clinician review.
-                    </p>
-                  </div>
-                )}
-                <PreVisitWorkup workup={presentationResult.suggested_workup} />
-              </>
+              <PreVisitWorkup workup={presentationResult.suggested_workup} />
             )}
 
             {/* Failed therapies */}

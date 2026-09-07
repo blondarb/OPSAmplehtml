@@ -1,3 +1,4 @@
+import { deriveClinicalTiming } from '@/lib/triage/clinicalTiming'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { authorizeMock, fromMock, selectMock, eqMock, singleMock } = vi.hoisted(
@@ -86,6 +87,26 @@ describe('triage result route safety', () => {
     expect(body).not.toHaveProperty('packet_safety')
     expect(body).not.toHaveProperty('safety_triage_session_id')
     expect(body).not.toHaveProperty('outpatient_scoring_blocked')
+  })
+
+  it('C01 reconstructs immediate action from a historical urgent-tier row and keeps outpatient outputs held', async () => {
+    const referral = 'Synthetic referral.\nSymptom onset: 2026-08-24T12:00:00Z'
+    const clinicalTiming = deriveClinicalTiming({ sourceText: referral, decisionAt: '2026-09-05T12:00:00Z', carePathway: 'routine_outpatient' })
+    singleMock.mockResolvedValueOnce({ data: {
+      id: 'triage-1', processing_status: 'complete', triage_tier: 'urgent',
+      care_pathway: 'same_day_clinician_review', review_requirement: 'immediate_clinician_review',
+      data_quality: 'partial', scheduling_locked: true, workflow_status: 'clinician_review',
+      suggested_workup: ['Synthetic MRI before clinic.'], subspecialty_recommendation: 'General Neurology',
+      referral_text: referral, safety_shadow_result: { clinicalTiming },
+    }, error: null })
+    const body = await (await callGet()).json()
+    expect(body.triage_tier_display).toContain('IMMEDIATE CLINICIAN REVIEW')
+    expect(body.triage_tier_display).not.toContain('Within 1 Week')
+    expect(body.suggested_workup).toEqual([])
+    expect(body.subspecialty_recommendation).toBe('')
+    expect(body.scheduling_locked).toBe(true)
+    expect(body.outpatient_finalization_allowed).toBe(false)
+    expect(body.clinical_timing).toMatchObject({ decisionAt: '2026-09-05T12:00:00Z', action: { requirement: 'immediate_clinician_review' } })
   })
 
   it('does not advertise final-disposition capability before the governed recommendation milestone', async () => {

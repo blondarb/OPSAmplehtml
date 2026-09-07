@@ -100,11 +100,11 @@ describe('buildTriageReport', () => {
       }),
     )
 
-    expect(report).toContain('Recommended Timeframe: Same-day clinician review')
+    expect(report).toContain('Recommended Timeframe: Clinician review now — do not defer until later today')
     expect(report).toContain('Triage Tier: URGENT')
     expect(report).not.toContain('Within 1 Week')
     expect(report).toContain(
-      'Information gathering must not delay same-day clinician review.',
+      'Information gathering must not delay immediate clinician review.',
     )
   })
 
@@ -213,9 +213,9 @@ describe('buildTriageReport', () => {
       }),
     )
 
-    expect(report).toContain('Recommended Timeframe: Same-day clinician review')
+    expect(report).toContain('Recommended Timeframe: Clinician review now — do not defer until later today')
     expect(report).toContain(
-      'Information gathering must not delay same-day clinician review.',
+      'Information gathering must not delay immediate clinician review.',
     )
     expect(report).not.toContain('Suggested Pre-Visit Workup')
     expect(report).not.toContain('Subspecialty Routing')

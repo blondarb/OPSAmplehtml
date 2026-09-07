@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg'
 import {
   buildTriageSummaryForConsult,
 } from '@/lib/consult/contextBuilder'
-import { formatTierDisplay } from './scoring'
+import { dispositionPresentation } from './dispositionPresentation'
 import type {
   CarePathway,
   DataQuality,
@@ -126,24 +126,27 @@ export async function finalizeTriageAttempt(
     return { ok: false, reason: 'persistence_failed' }
   }
 
-  const tierDisplayByTier = Object.fromEntries(
-    TRIAGE_TIERS.map((tier) => [
-      tier,
-      formatTierDisplay(tier, input.redFlagOverride),
-    ]),
-  )
-  const summaryByTier = Object.fromEntries(
-    TRIAGE_TIERS.map((tier) => [
-      tier,
-      buildTriageSummaryForConsult(
-        tierDisplayByTier[tier],
-        input.clinicalReasons,
-        input.suggestedWorkup,
-        input.subspecialtyRecommendation,
-        input.subspecialtyRationale,
-      ),
-    ]),
-  )
+  // PostgreSQL chooses the final presentation key after locking the workflow.
+  // Precompute every safe display; do not format from the worker's stale tier.
+  const presentations = [
+    ...TRIAGE_TIERS.flatMap((tier) => [{ key: tier as string, tier }, { key: `held_${tier}`, tier }]),
+    { key: 'emergency_now', tier: 'emergent' as const, carePathway: 'emergency_now' as const },
+    { key: 'immediate_clinician_review', tier: 'urgent' as const, reviewRequirement: 'immediate_clinician_review' as const },
+    { key: 'undetermined', tier: 'insufficient_data' as const, carePathway: 'undetermined' as const },
+  ]
+  const tierDisplayByTier = Object.fromEntries(presentations.map((item) => [
+    item.key, dispositionPresentation({ ...item, redFlagOverride: input.redFlagOverride }).display,
+  ]))
+  const summaryByTier = Object.fromEntries(presentations.map((item) => {
+    const held = item.key.startsWith('held_') || ['emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data'].includes(item.key)
+    return [item.key, buildTriageSummaryForConsult(
+      tierDisplayByTier[item.key],
+      input.clinicalReasons,
+      held ? [] : input.suggestedWorkup,
+      held ? '' : input.subspecialtyRecommendation,
+      held ? '' : input.subspecialtyRationale,
+    )]
+  }))
 
   let client: PoolClient | null = null
   try {
@@ -223,7 +226,7 @@ export async function finalizeTriageAttempt(
                 END AS final_care_pathway
            FROM eligible_session session
        ),
-       resolved AS (
+       resolved_tier AS (
          SELECT pathway.*,
                 CASE
                   WHEN pathway.final_care_pathway = 'emergency_now'
@@ -235,6 +238,19 @@ export async function finalizeTriageAttempt(
                   ELSE $5
                 END AS final_triage_tier
            FROM resolved_pathway pathway
+       ),
+       resolved AS (
+         SELECT resolved_tier.*,
+                CASE
+                  WHEN final_care_pathway = 'emergency_now' OR review_requirement = 'emergency_action'
+                    THEN 'emergency_now'
+                  WHEN final_care_pathway = 'same_day_clinician_review' OR review_requirement = 'immediate_clinician_review'
+                    THEN 'immediate_clinician_review'
+                  WHEN final_care_pathway = 'undetermined' THEN 'undetermined'
+                  WHEN data_quality IN ('insufficient', 'conflicting') THEN 'held_' || final_triage_tier
+                  ELSE final_triage_tier
+                END AS presentation_key
+           FROM resolved_tier
        ),
        upserted_system_consult AS (
          INSERT INTO neurology_consults AS consult (
@@ -257,11 +273,11 @@ export async function finalizeTriageAttempt(
                 'triage_complete',
                 resolved.id,
                 resolved.final_triage_tier,
-                $21::jsonb ->> resolved.final_triage_tier,
-                $22::jsonb ->> resolved.final_triage_tier,
+                $21::jsonb ->> resolved.presentation_key,
+                $22::jsonb ->> resolved.presentation_key,
                 $23,
                 ARRAY(SELECT jsonb_array_elements_text($12::jsonb)),
-                $16,
+                CASE WHEN resolved.presentation_key IN ('emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data') OR resolved.presentation_key LIKE 'held_%' THEN '' ELSE $16::text END,
                 now(),
                 $25,
                 now()
@@ -304,11 +320,15 @@ export async function finalizeTriageAttempt(
                 weighted_score = $10,
                 clinical_reasons = $11::jsonb,
                 red_flags = $12::jsonb,
-                suggested_workup = $13::jsonb,
+                suggested_workup = CASE
+                  WHEN finalizable.presentation_key IN ('emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data')
+                    OR finalizable.data_quality IN ('insufficient', 'conflicting') THEN '[]'::jsonb
+                  ELSE $13::jsonb
+                END,
                 failed_therapies = $14::jsonb,
                 missing_information = $15::jsonb,
-                subspecialty_recommendation = $16,
-                subspecialty_rationale = $17,
+                subspecialty_recommendation = CASE WHEN finalizable.presentation_key IN ('emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data') OR finalizable.presentation_key LIKE 'held_%' THEN '' ELSE $16::text END,
+                subspecialty_rationale = CASE WHEN finalizable.presentation_key IN ('emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data') OR finalizable.presentation_key LIKE 'held_%' THEN '' ELSE $17::text END,
                 ai_raw_response = $18::jsonb,
                 ai_input_tokens = $19,
                 ai_output_tokens = $20,
@@ -339,20 +359,21 @@ export async function finalizeTriageAttempt(
                     session.care_pathway,
                     session.data_quality,
                     session.review_requirement,
-                    session.workflow_status
+                    session.workflow_status,
+                    finalizable.presentation_key
        ),
        updated_consult AS (
          UPDATE neurology_consults consult
             SET status = 'triage_complete',
                 triage_session_id = updated.id,
                 triage_urgency = updated.triage_tier,
-                triage_tier_display = $21::jsonb ->> updated.triage_tier,
-                triage_summary = $22::jsonb ->> updated.triage_tier,
+                triage_tier_display = $21::jsonb ->> updated.presentation_key,
+                triage_summary = $22::jsonb ->> updated.presentation_key,
                 triage_chief_complaint = $23,
                 triage_red_flags = ARRAY(
                   SELECT jsonb_array_elements_text($12::jsonb)
                 ),
-                triage_subspecialty = $16,
+                triage_subspecialty = CASE WHEN updated.presentation_key IN ('emergency_now', 'immediate_clinician_review', 'undetermined', 'emergent', 'insufficient_data') OR updated.presentation_key LIKE 'held_%' THEN '' ELSE $16::text END,
                 triage_completed_at = now(),
                 updated_at = now()
            FROM updated_session updated, locked_consult locked

@@ -1,18 +1,21 @@
 -- Synthetic-only fixture for an EMPTY disposable PostgreSQL database.
 \set ON_ERROR_STOP on
 CREATE TABLE validation_cases (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),study_name text NOT NULL,referral_text text NOT NULL,patient_age integer,patient_sex text,active boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE validation_reviews(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),reviewer_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE validation_reviews(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),reviewer_id text NOT NULL,triage_tier text DEFAULT 'routine',created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE validation_ai_runs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),ai_triage_tier text,created_at timestamptz NOT NULL DEFAULT now());
 INSERT INTO validation_cases(id,study_name,referral_text) VALUES('00000000-0000-0000-0000-000000000001','legacy','SYNTHETIC ORIGINAL');
 INSERT INTO validation_reviews(case_id,reviewer_id) VALUES('00000000-0000-0000-0000-000000000001','old-identity');
 INSERT INTO validation_ai_runs(case_id,ai_triage_tier) VALUES('00000000-0000-0000-0000-000000000001','routine');
 CREATE TEMP TABLE original_evidence AS SELECT (SELECT jsonb_agg(to_jsonb(r)) FROM validation_reviews r) reviews,(SELECT jsonb_agg(to_jsonb(r)) FROM validation_ai_runs r) runs;
 \ir ../../../migrations/061_triage_validation_governance.sql
+\ir ../../../migrations/063_triage_validation_clinical_assessment.sql
 CREATE FUNCTION expect_locked(command text) RETURNS void LANGUAGE plpgsql AS $$ BEGIN BEGIN EXECUTE command; EXCEPTION WHEN SQLSTATE '55000' THEN RETURN; END; RAISE EXCEPTION 'Expected lock: %',command; END $$;
+CREATE FUNCTION expect_invalid_assessment(command text) RETURNS void LANGUAGE plpgsql AS $$ BEGIN BEGIN EXECUTE command; EXCEPTION WHEN SQLSTATE '22023' THEN RETURN; END; RAISE EXCEPTION 'Expected invalid assessment: %',command; END $$;
 SELECT expect_locked($q$INSERT INTO triage_validation_studies(study_name,tenant_id) VALUES('legacy','tenant-a')$q$);
 INSERT INTO triage_validation_studies(study_name,tenant_id,study_kind,phase,archive_manifest) VALUES('legacy','tenant-a','legacy_archive','archived','{"case_count":1,"review_count":1,"run_count":1,"reviewed_by":"synthetic-operator","reviewed_at":"2026-09-05","source_provenance":"legacy_unknown"}');
 DO $$ BEGIN
- IF (SELECT jsonb_agg(to_jsonb(r)-'comfortable_with_wait'-'reviewer_kind'-'observed_source_sha256'-'label_context') FROM validation_reviews r) IS DISTINCT FROM (SELECT reviews FROM original_evidence) OR (SELECT jsonb_agg(to_jsonb(r)) FROM validation_ai_runs r) IS DISTINCT FROM (SELECT runs FROM original_evidence) THEN RAISE EXCEPTION 'Historical evidence changed'; END IF;
+ IF EXISTS(SELECT 1 FROM validation_reviews WHERE clinical_assessment IS NOT NULL) THEN RAISE EXCEPTION 'Historical clinical labels were fabricated'; END IF;
+ IF (SELECT jsonb_agg(to_jsonb(r)-'comfortable_with_wait'-'reviewer_kind'-'observed_source_sha256'-'label_context'-'clinical_assessment') FROM validation_reviews r) IS DISTINCT FROM (SELECT reviews FROM original_evidence) OR (SELECT jsonb_agg(to_jsonb(r)) FROM validation_ai_runs r) IS DISTINCT FROM (SELECT runs FROM original_evidence) THEN RAISE EXCEPTION 'Historical evidence changed'; END IF;
 END $$;
 SELECT expect_locked($q$UPDATE validation_cases SET referral_text='REPLACED' WHERE study_name='legacy'$q$);
 SELECT expect_locked($q$DELETE FROM validation_reviews WHERE reviewer_id='old-identity'$q$);
@@ -26,16 +29,31 @@ UPDATE validation_cases SET patient_age=40,patient_sex='F' WHERE study_name='stu
 DO $$ BEGIN IF (SELECT observed_source_sha256 FROM validation_cases WHERE study_name='study-a')=(SELECT hash FROM before_demographics) THEN RAISE EXCEPTION 'Demographics not bound'; END IF; END $$;
 UPDATE triage_validation_studies SET phase='labeling' WHERE study_name='study-a';
 SELECT expect_locked($q$UPDATE validation_cases SET active=false WHERE study_name='study-a'$q$);
-INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-a','yes'),('00000000-0000-0000-0000-000000000002','nurse','no');
+INSERT INTO validation_reviews(case_id,reviewer_id,triage_tier,comfortable_with_wait,clinical_assessment) VALUES
+('00000000-0000-0000-0000-000000000002','physician-a','routine','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":24,"unit":"hours"}},"services":["General Neurology","MS / Neuroimmunology"],"decisive_missing_facts":["synthetic detail"]}'),
+('00000000-0000-0000-0000-000000000002','nurse','insufficient_data','no','{"version":"v1","action":"clarify_before_disposition","latest_safe_assessment":{"origin":"unknown"},"services":[],"decisive_missing_facts":["synthetic detail"]}');
 SELECT expect_locked($q$UPDATE triage_validation_studies SET phase='unblinded' WHERE study_name='study-a'$q$);
-INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-b','uncertain');
+INSERT INTO validation_reviews(case_id,reviewer_id,triage_tier,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','urgent','uncertain','{"version":"v1","action":"clinician_review_now","latest_safe_assessment":{"origin":"decision_time","interval":{"value":0,"unit":"minutes"}},"services":["General Neurology"],"decisive_missing_facts":[]}');
 DO $$ BEGIN
- BEGIN INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-a','yes');
+ BEGIN INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-a','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":24,"unit":"hours"}},"services":[],"decisive_missing_facts":[]}');
  EXCEPTION WHEN unique_violation THEN RETURN; END;
  RAISE EXCEPTION 'Duplicate independent label accepted';
 END $$;
 UPDATE triage_validation_studies SET phase='unblinded' WHERE study_name='study-a';
 SELECT expect_locked($q$UPDATE validation_reviews SET comfortable_with_wait='yes' WHERE reviewer_id='nurse'$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,triage_tier,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','non_urgent','yes','{"version":"v1","action":"emergency_now","latest_safe_assessment":{"origin":"decision_time","interval":{"value":0,"unit":"minutes"}},"services":[],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,triage_tier,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','urgent','yes','{"version":"v1","action":"clinician_review_now","latest_safe_assessment":{"origin":"decision_time","interval":{"value":0,"unit":"minutes"}},"services":[],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":null,"action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":24,"unit":"hours"}},"services":[],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":24,"unit":"hours"}},"services":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":"24","unit":"hours"}},"services":[],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"decision_time","interval":{"value":24,"unit":"hours"}},"services":[4],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"emergency_now","latest_safe_assessment":{"origin":"unknown"},"services":[],"decisive_missing_facts":[]}')$q$);
+SELECT expect_invalid_assessment($q$INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"emergency_now","latest_safe_assessment":{"origin":"decision_time","interval":{"value":2,"unit":"hours"}},"services":[],"decisive_missing_facts":[]}')$q$);
+DO $$ BEGIN
+  BEGIN INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait,clinical_assessment) VALUES('00000000-0000-0000-0000-000000000002','physician-b','yes','{"version":"v1","action":"outpatient_assessment","latest_safe_assessment":{"origin":"unknown","interval":{"value":1,"unit":"hours"}},"services":[],"decisive_missing_facts":[]}');
+  EXCEPTION WHEN SQLSTATE '22023' THEN RETURN; END;
+  RAISE EXCEPTION 'Invalid clinical assessment accepted';
+END $$;
 SELECT expect_locked($q$UPDATE triage_validation_studies SET phase='labeling' WHERE study_name='study-a'$q$);
 INSERT INTO triage_validation_attempts(study_name,case_id,request_key,source_sha256,configuration_revision,scope,created_by) SELECT study_name,id,'00000000-0000-0000-0000-000000000003',observed_source_sha256,'revision','scorer_consistency','synthetic-admin' FROM validation_cases WHERE study_name='study-a';
 SELECT expect_locked($q$INSERT INTO triage_validation_receipts(study_name,case_id,request_key,source_sha256,source_commit,configuration,configuration_revision,evaluation_scope,status,result,created_by) SELECT study_name,id,'00000000-0000-0000-0000-000000000003',observed_source_sha256,'synthetic-source','{}','WRONG','scorer_consistency','error','{}','synthetic-admin' FROM validation_cases WHERE study_name='study-a'$q$);
