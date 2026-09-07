@@ -2,7 +2,7 @@
  * Deterministic pre-layer for the AI Historian thoroughness judge
  * (Historian Validation Suite Task 3). Runs BEFORE the LLM judge call and
  * its findings are always appended into the final result — never skipped,
- * regardless of what the LLM says (see thoroughnessJudge.ts). Four checks:
+ * regardless of what the LLM says (see thoroughnessJudge.ts). Five checks:
  *
  *   1. Diagnosis-leak lexicon scan — the historian must never diagnose
  *      (CORE_PROMPT rules 3-4 in historianPrompts.ts). Scans ASSISTANT
@@ -15,6 +15,11 @@
  *      paraphrases rather than reciting the prompt's example verbatim, so
  *      this is a signal-word-overlap check, not an exact match — see
  *      extractSignalWords.
+ *   2b. False-closing phrase counter — CORE_PROMPT RULE 12 forbids "one
+ *      last thing" phrasing unless the turn genuinely is the last
+ *      question. Counts non-final ASSISTANT turns matching
+ *      FALSE_CLOSING_PATTERNS; flags >=2 as RULE 12 drift (1 is expected
+ *      from the preclose gate's single legitimate false close).
  *   3. Turn cap — the historian's own CRITICAL RULE 13 caps at 25 patient
  *      turns; flags a session that exceeded it.
  *   4. Structured-output shape — the required fields on
@@ -198,6 +203,70 @@ export function checkPhaseMarkers(transcript: HistorianTranscriptEntry[]): Phase
   }
 }
 
+// ── 2b. False-closing phrase counter (RULE 12 drift) ────────────────────────
+//
+// RULE 12 in historianPrompts.ts (CORE_PROMPT, ~line 39) forbids "one last
+// thing" / "just one more thing" phrasing unless the turn genuinely is the
+// last question. In live sessions the voice model violates this repeatedly
+// — a 100-turn session was observed with 8 such phrases spread over 3
+// minutes before the real closing message. The preclose gate
+// (historian/precloseGate.ts) legitimately produces at most ONE false close
+// per session (it rejects save_interview_output once and injects a note
+// asking for missing items), so exactly one non-final occurrence is
+// expected; two or more is prompt drift worth flagging.
+
+/**
+ * Case-insensitive, word-boundary-safe patterns for "this is basically the
+ * last thing" phrasing. Deliberately generic (no diagnosis-specific text)
+ * so this stays a phrasing check, not a clinical-content check.
+ */
+export const FALSE_CLOSING_PATTERNS: RegExp[] = [
+  /\bone last thing\b/i,
+  /\bone last check\b/i,
+  /\bone last question\b/i,
+  /\bjust one more\b/i,
+  /\bone more thing\b/i,
+  /\bfinally,/i,
+  /\band finally\b/i,
+  /\bbefore we finish\b/i,
+  /\bbefore we wrap\b/i,
+  /\bwrap up\b/i,
+  /\bwrapping up\b/i,
+  /\blast thing before\b/i,
+  /\bthat's everything I need\b/i,
+]
+
+export interface FalseClosingCheckResult {
+  count: number
+  turnIndexes: number[]
+}
+
+/**
+ * Scans every ASSISTANT turn EXCEPT the final assistant turn (the real
+ * closing message) for any FALSE_CLOSING_PATTERNS hit. A turn counts at
+ * most once even if it matches more than one pattern.
+ */
+export function countFalseClosings(transcript: HistorianTranscriptEntry[]): FalseClosingCheckResult {
+  const assistantTurnIndexes = transcript.reduce<number[]>((acc, turn, index) => {
+    if (turn.role === 'assistant') acc.push(index)
+    return acc
+  }, [])
+  const finalAssistantIndex = assistantTurnIndexes[assistantTurnIndexes.length - 1]
+
+  const turnIndexes: number[] = []
+  transcript.forEach((turn, turnIndex) => {
+    if (turn.role !== 'assistant') return
+    if (turnIndex === finalAssistantIndex) return
+    if (FALSE_CLOSING_PATTERNS.some((regex) => regex.test(turn.text))) {
+      turnIndexes.push(turnIndex)
+    }
+  })
+  return { count: turnIndexes.length, turnIndexes }
+}
+
+/** count >= this many non-final false-closing turns is flagged as an issue — 1 is expected from the preclose gate, so the threshold is 2. */
+export const FALSE_CLOSING_ISSUE_THRESHOLD = 2
+
 // ── 3. Turn cap ───────────────────────────────────────────────────────────────
 
 export interface TurnCapCheckResult {
@@ -304,6 +373,7 @@ export function computeCriticalCoverage(
 export interface DeterministicCheckResult {
   diagnosisLeak: DiagnosisLeakCheckResult
   phaseMarkers: PhaseMarkerCheckResult
+  falseClosings: FalseClosingCheckResult
   turnCap: TurnCapCheckResult
   structuredOutput: StructuredOutputCheckResult
   criticalCoverage: CriticalCoverageEntry[]
@@ -319,6 +389,7 @@ export function runDeterministicChecks(
 ): DeterministicCheckResult {
   const diagnosisLeak = scanForDiagnosisLeak(transcript)
   const phaseMarkers = checkPhaseMarkers(transcript)
+  const falseClosings = countFalseClosings(transcript)
   const turnCap = checkTurnCap(transcript)
   const structuredOutputResult = checkStructuredOutputValidity(structuredOutput, narrativeSummary)
   const criticalCoverage = computeCriticalCoverage(transcript, criticalQuestions)
@@ -333,10 +404,23 @@ export function runDeterministicChecks(
   if (!phaseMarkers.closingPresent) {
     issues.push('closing phase-marker not detected in the last assistant turn')
   }
+  if (falseClosings.count >= FALSE_CLOSING_ISSUE_THRESHOLD) {
+    issues.push(
+      `false closing phrases in ${falseClosings.count} non-final assistant turns (RULE 12 drift; 1 is expected from the preclose gate)`,
+    )
+  }
   if (turnCap.exceeded) {
     issues.push(`patient turn count ${turnCap.patientTurnCount} exceeds the ${turnCap.limit}-turn cap`)
   }
   issues.push(...structuredOutputResult.issues)
 
-  return { diagnosisLeak, phaseMarkers, turnCap, structuredOutput: structuredOutputResult, criticalCoverage, issues }
+  return {
+    diagnosisLeak,
+    phaseMarkers,
+    falseClosings,
+    turnCap,
+    structuredOutput: structuredOutputResult,
+    criticalCoverage,
+    issues,
+  }
 }
