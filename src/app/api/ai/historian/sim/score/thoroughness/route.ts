@@ -39,23 +39,12 @@ export async function POST(request: Request) {
       chiefComplaint = undefined
     }
 
-    // Non-fatal: if thoroughness fails, return nulls so the run still persists.
+    // Lean Haiku thoroughness (fast) — the heavy production judge ran past the
+    // ~30s gateway. Non-fatal: return nulls so the run still persists.
     try {
-      const { generateThoroughnessEvaluationWithUsage } = await import('@/lib/historian/eval/thoroughnessJudge')
-      const { computeCostUsd } = await import('@/lib/historian/eval/constants')
-      const { evaluation, usage } = await generateThoroughnessEvaluationWithUsage(transcript, {
-        chiefComplaint,
-        syndrome: persona,
-        structuredOutput: null,
-        narrativeSummary: null,
-      })
-      return NextResponse.json({
-        thoroughness: {
-          result: evaluation,
-          modelId: evaluation.provenance.model_id,
-          costUsd: computeCostUsd(evaluation.provenance.model_id, usage),
-        },
-      })
+      const { generateSimThoroughness } = await import('@/lib/historian/sim/simThoroughness')
+      const { result, modelId, costUsd } = await generateSimThoroughness(transcript, chiefComplaint)
+      return NextResponse.json({ thoroughness: { result, modelId, costUsd } })
     } catch (err) {
       console.error('[sim/score/thoroughness] failed (non-fatal):', err)
       return NextResponse.json({ thoroughness: { result: null, modelId: null, costUsd: null } })

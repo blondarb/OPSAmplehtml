@@ -63,18 +63,14 @@ export async function scoreAndPersistSimRun(opts: {
   let thoroughnessModel: string | null = opts.thoroughness?.modelId ?? null
   let thoroughnessCost: number | null = opts.thoroughness?.costUsd ?? null
   if (!thoroughnessResult) {
+    // Lean Haiku thoroughness (fast) so the scripted single-request path also
+    // stays under the gateway. Non-fatal.
     try {
-      const { generateThoroughnessEvaluationWithUsage } = await import('@/lib/historian/eval/thoroughnessJudge')
-      const { computeCostUsd } = await import('@/lib/historian/eval/constants')
-      const { evaluation, usage } = await generateThoroughnessEvaluationWithUsage(transcript, {
-        chiefComplaint,
-        syndrome: persona,
-        structuredOutput: null,
-        narrativeSummary: null,
-      })
-      thoroughnessResult = evaluation
-      thoroughnessModel = evaluation.provenance.model_id
-      thoroughnessCost = computeCostUsd(evaluation.provenance.model_id, usage)
+      const { generateSimThoroughness } = await import('@/lib/historian/sim/simThoroughness')
+      const { result, modelId, costUsd } = await generateSimThoroughness(transcript, chiefComplaint)
+      thoroughnessResult = result
+      thoroughnessModel = modelId
+      thoroughnessCost = costUsd
     } catch (err) {
       console.error('[scoreSimTranscript] thoroughness failed (non-fatal):', err)
     }
