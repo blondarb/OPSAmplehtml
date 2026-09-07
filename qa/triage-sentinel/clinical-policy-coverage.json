@@ -1,0 +1,170 @@
+{
+  "schemaVersion": "1.0",
+  "synthetic": true,
+  "clinicalValidationClaim": false,
+  "purpose": "Development safety coverage map for approved C01-C20 sketches. It does not supply independent clinical truth labels.",
+  "coverage": [
+    {
+      "id": "C01",
+      "kind": "primary_integration",
+      "cases": [
+        "C01-display-same-day",
+        "stroke-uncertain-onset-same-day"
+      ],
+      "owner": "primary_display_and_notification"
+    },
+    {
+      "id": "C02",
+      "kind": "catalog_pair",
+      "cases": [
+        "C02-new-papilledema-unassessed",
+        "raised-icp-current",
+        "raised-icp-remote-hard-negative"
+      ]
+    },
+    {
+      "id": "C03",
+      "kind": "catalog_extension",
+      "cases": [
+        "C03-diplopia-ptosis-unassessed"
+      ]
+    },
+    {
+      "id": "C04",
+      "kind": "catalog_pair",
+      "cases": [
+        "C04-ambulatory-rapid-weakness",
+        "neuromuscular-respiratory-current"
+      ]
+    },
+    {
+      "id": "C05",
+      "kind": "catalog_pair",
+      "cases": [
+        "C05-ambulatory-cauda",
+        "cauda-equina-current",
+        "cauda-ruled-out-hard-negative"
+      ]
+    },
+    {
+      "id": "C06",
+      "kind": "catalog_pair",
+      "cases": [
+        "C06-thunderclap-ct-only",
+        "sah-thunderclap-current"
+      ]
+    },
+    {
+      "id": "C07",
+      "kind": "catalog_pair",
+      "cases": [
+        "C07-resolved-tia-unassessed",
+        "stroke-current-short-rural",
+        "stroke-remote-stable-hard-negative"
+      ]
+    },
+    {
+      "id": "C08",
+      "kind": "catalog_extension",
+      "cases": [
+        "C08-ms-day12-unassessed"
+      ]
+    },
+    {
+      "id": "C09",
+      "kind": "catalog_pair",
+      "cases": [
+        "C09a-functional-seizure-stable",
+        "C09b-functional-seizure-new-type"
+      ]
+    },
+    {
+      "id": "C10",
+      "kind": "observational_pair",
+      "cases": [
+        "C10a-first-seizure-age39",
+        "C10b-first-seizure-age41"
+      ]
+    },
+    {
+      "id": "C11",
+      "kind": "primary_chronology",
+      "cases": [
+        "C11-header-chronology",
+        "long-mayo-like-final-page-stroke"
+      ],
+      "owner": "primary_clinical_timing"
+    },
+    {
+      "id": "C12",
+      "kind": "observational_pair",
+      "cases": [
+        "C12-raw-summary-disagreement",
+        "conflicting-current-versus-baseline-model-only"
+      ]
+    },
+    {
+      "id": "C13",
+      "kind": "catalog_extension",
+      "cases": [
+        "C13-language-uncertainty",
+        "sah-thunderclap-current"
+      ]
+    },
+    {
+      "id": "C14",
+      "kind": "catalog_extension",
+      "cases": [
+        "C14-dizzy-no-hints"
+      ]
+    },
+    {
+      "id": "C15",
+      "kind": "catalog_extension",
+      "cases": [
+        "C15-typical-migraine-no-workup"
+      ]
+    },
+    {
+      "id": "C16",
+      "kind": "catalog_pair",
+      "cases": [
+        "C16a-radicular-stable",
+        "C16b-radicular-changed-gait"
+      ]
+    },
+    {
+      "id": "C17",
+      "kind": "catalog_extension",
+      "cases": [
+        "C17-gca-shared-care",
+        "vision-threat-current"
+      ]
+    },
+    {
+      "id": "C18",
+      "kind": "primary_integration",
+      "cases": [
+        "C18-organization-availability"
+      ],
+      "owner": "primary_organization_adapter"
+    },
+    {
+      "id": "C19",
+      "kind": "unit_regression",
+      "cases": [
+        "C19-branch-failure-emergency"
+      ],
+      "owner": "sentinel_live_runner"
+    },
+    {
+      "id": "C20",
+      "kind": "observational_pair",
+      "cases": [
+        "C20a-two-failed-therapies",
+        "C20b-three-failed-therapies",
+        "C20c-baseline-disability"
+      ]
+    }
+  ]
+}

@@ -658,7 +658,7 @@ export async function POST(request: Request) {
         referral_text,
         gatewayText: referral_text,
         textForScoring:
-          adjudicationText ?? extracted_summary ?? referral_text,
+          adjudicationText ?? referral_text,
         patient_age,
         patient_sex,
         referring_provider_type,

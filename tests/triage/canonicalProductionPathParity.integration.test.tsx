@@ -293,11 +293,8 @@ describe('canonical no-cloud production-path PDF/paste parity', () => {
       workflowStatus: 'emergency_hold',
       schedulingLocked: true,
       humanReviewHold: true,
-      service: 'Stroke',
-      advice: [
-        'MRI brain without contrast — synthetic outpatient scorer suggestion.',
-        'CTA head and neck — synthetic outpatient scorer suggestion.',
-      ],
+      service: '',
+      advice: [],
       missingInformation: [
         'SAFETY: exact last-known-well and symptom-onset time requires confirmation.',
       ],
@@ -345,9 +342,12 @@ describe('canonical no-cloud production-path PDF/paste parity', () => {
       ),
     ).toBe(true)
     expect(trace.scoringModelPrompts).toHaveLength(2)
-    expect(trace.scoringModelPrompts[0]).toBe(trace.scoringModelPrompts[1])
+    // Each attempt has its own server clock; the source and source-linked
+    // chronology must still be identical across input modalities.
+    const withoutClock = (prompt: string) => prompt.replace(/Decision clock \(server supplied\): [^\n]+/, 'Decision clock: fixed for parity comparison')
+    expect(withoutClock(trace.scoringModelPrompts[0])).toBe(withoutClock(trace.scoringModelPrompts[1]))
     expect(trace.scoringModelPrompts[0]).toContain(
-      'resolved acute focal neurologic episode',
+      LATE_PAGE_MARKER,
     )
     expect(trace.adjudicatorSources).toStrictEqual([
       independentlyParsed.text,

@@ -1,3 +1,4 @@
+import { withClinicalTimingAction, type ClinicalTimingV1 } from './clinicalTiming'
 import { getPool } from '@/lib/db'
 import type { EnsembleFusionDecision } from './ensemblePolicy'
 import type { ValidatedModelSafetyExtraction } from './modelSafetyExtraction'
@@ -26,6 +27,7 @@ export interface PersistModelSafetyFusionInput {
   adjudicatorModelProfile?: string | null
   adjudicatorPromptVersion?: string | null
   processingAttemptCount: number
+  clinicalTiming?: ClinicalTimingV1
 }
 
 export type PersistModelSafetyFusionResult =
@@ -107,6 +109,7 @@ export async function persistModelSafetyFusion(
         : input.fusion.dataQuality
     const shadowResult = mergeFlatSafetySnapshot(workflow.safety_shadow_result, {
       modelSafety: input.safetyResult,
+      ...(input.clinicalTiming ? { clinicalTiming: withClinicalTimingAction(input.clinicalTiming, targetCarePathway, targetReviewRequirement) } : {}),
       modelSafetyFailure: input.safetyFailure ?? null,
       outpatientScoring: {
         status: input.scoringStatus,

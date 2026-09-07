@@ -1,3 +1,4 @@
+import { TRIAGE_SYSTEM_PROMPT } from '@/lib/triage/systemPrompt'
 import { describe, it, expect } from 'vitest'
 import {
   calculateTriageDecision,
@@ -607,5 +608,14 @@ describe('formatTierDisplay', () => {
 
   it('formats emergent correctly', () => {
     expect(formatTierDisplay('emergent')).toBe('EMERGENT — Redirect to ED Immediately')
+  })
+})
+
+
+describe('governed clinical destination contract', () => {
+  it('accepts MS / Neuroimmunology and includes every governed service in the scorer contract', () => {
+    const raw = { ...validRawModelResponse(), subspecialty_recommendation: 'MS / Neuroimmunology' }
+    expect(parseAndNormalizeAIResponse(raw).subspecialty_recommendation).toBe('MS / Neuroimmunology')
+    expect(TRIAGE_SYSTEM_PROMPT).toContain(`"subspecialty_recommendation": "${NEURO_SUBSPECIALTIES.join(' | ')}"`)
   })
 })

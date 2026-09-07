@@ -41,9 +41,11 @@ export default function TriageTierBadge({
         backgroundColor: config.bgColor,
         color: config.textColor,
         border: `1px solid ${config.borderColor}`,
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        maxWidth: '100%',
       }}>
-        {config.label}
+        {timeframeOverride ?? config.label}
       </span>
     )
   }

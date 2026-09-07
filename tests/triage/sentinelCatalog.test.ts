@@ -10,6 +10,14 @@ import {
 } from '@/lib/triage/sentinel/catalog'
 
 const catalogPath = resolve(process.cwd(), 'qa/triage-sentinel/cases.json')
+const clinicalPolicyCatalogPath = resolve(
+  process.cwd(),
+  'qa/triage-sentinel/clinical-policy-cases.json',
+)
+const clinicalPolicyCoveragePath = resolve(
+  process.cwd(),
+  'qa/triage-sentinel/clinical-policy-coverage.json',
+)
 
 function loadRawCatalog(): unknown {
   return JSON.parse(readFileSync(catalogPath, 'utf8'))
@@ -103,6 +111,74 @@ describe('parseSentinelCatalog', () => {
         item.executionModes.includes('live_ensemble'),
       ),
     ).toBe(true)
+  })
+
+  it('keeps the approved clinical counterexamples in a separate synthetic, live-only development catalog', () => {
+    const clinicalCatalog = parseSentinelCatalog(
+      JSON.parse(readFileSync(clinicalPolicyCatalogPath, 'utf8')),
+    )
+    const coverage = JSON.parse(
+      readFileSync(clinicalPolicyCoveragePath, 'utf8'),
+    ) as { clinicalValidationClaim: boolean; coverage: Array<{ id: string; cases: string[] }> }
+
+    expect(clinicalCatalog.synthetic).toBe(true)
+    expect(clinicalCatalog.cases.length).toBeGreaterThan(20)
+    expect(
+      clinicalCatalog.cases.every((item) =>
+        item.executionModes.includes('live_ensemble'),
+      ),
+    ).toBe(true)
+    expect(
+      clinicalCatalog.cases.some((item) =>
+        item.tags.includes('observational'),
+      ),
+    ).toBe(true)
+    expect(coverage.clinicalValidationClaim).toBe(false)
+    expect(coverage.coverage.map((item) => item.id)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `C${String(index + 1).padStart(2, '0')}`),
+    )
+    for (const entry of coverage.coverage) {
+      expect(entry.cases.length).toBeGreaterThan(0)
+    }
+    expect(
+      clinicalCatalog.cases.find((item) => item.id === 'C08-ms-day12-unassessed')
+        ?.decisionAt,
+    ).toBe('2026-09-05T12:00:00.000Z')
+    expect(
+      clinicalCatalog.cases.find((item) => item.id === 'C11-header-chronology')
+        ?.decisionAt,
+    ).toBe('2026-09-05T12:00:00.000Z')
+  })
+
+  it('provides neutral source-only study imports and separately executable comparison variants', () => {
+    const catalog = parseSentinelCatalog(JSON.parse(readFileSync(clinicalPolicyCatalogPath, 'utf8')))
+    const rows = JSON.parse(readFileSync(resolve(process.cwd(), 'qa/triage-sentinel/clinical-policy-study-cases.json'), 'utf8')) as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(catalog.cases.length)
+    rows.forEach((row, index) => {
+      const item = catalog.cases[index]
+      expect(item.input.kind).toBe('note')
+      expect(row).toEqual({ case_number: index + 1, title: `Case ${index + 1}`, referral_text: item.input.kind === 'note' ? item.input.text : '', patient_age: null, patient_sex: null, is_calibration: false })
+      expect(Object.keys(row)).not.toContain('expected')
+      expect(String(row.referral_text)).not.toMatch(/Record urgency|Record tier|Inspect primary-care|Preserve coordinated care|Reconsider co-occurring/i)
+    })
+    for (const group of ['C09', 'C10', 'C16', 'C20']) {
+      const variants = catalog.cases.filter(item => item.id.startsWith(group))
+      expect(variants.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(variants.map(item => item.input.kind === 'note' ? item.input.text : '')).size).toBe(variants.length)
+    }
+  })
+
+  it('accepts only fixed UTC instants for a reproducible case decision clock', () => {
+    const raw = loadRawCatalog() as {
+      cases: Array<Record<string, unknown>>
+      [key: string]: unknown
+    }
+    expect(() =>
+      parseSentinelCatalog({
+        ...raw,
+        cases: [{ ...raw.cases[0], decisionAt: '2026-09-05T12:00:00-06:00' }],
+      }),
+    ).toThrow(/UTC instant/i)
   })
 
   it('allows an explicit missing-source case but rejects an empty ordinary note', () => {

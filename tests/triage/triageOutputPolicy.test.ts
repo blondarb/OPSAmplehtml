@@ -135,7 +135,7 @@ describe('triageOutputPolicy', () => {
       }),
     )
 
-    expect(policy.timeframe).toBe('Same-day clinician review')
+    expect(policy.timeframe).toBe('Clinician review now — do not defer until later today')
   })
 
   it('shows missing information even when an urgency floor prevents the insufficient-data tier', () => {
@@ -226,7 +226,7 @@ describe('triageOutputPolicy', () => {
     )
 
     expect(policy).toMatchObject({
-      timeframe: 'Same-day clinician review',
+      timeframe: 'Clinician review now — do not defer until later today',
       insufficientDataHold: true,
       showPreVisitWorkup: false,
       showOutpatientRouting: false,

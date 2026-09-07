@@ -48,4 +48,32 @@ describe('runTriage model-output boundary', () => {
       /emergency_override=true preserved/i,
     )
   })
+
+  it('uses the server decision clock with raw chronology source when prompt scoring uses a summary', async () => {
+    invokeMock.mockResolvedValueOnce({ parsed: {} })
+
+    await expect(
+      runTriage({
+        referral_text: 'Synthetic scorer summary.',
+        chronologySourceText: 'Document date: 2025-12-15\nSynthetic raw source.',
+        decisionAt: '2026-09-05T12:00:00.000Z',
+      }),
+    ).rejects.toBeInstanceOf(AITriageModelOutputError)
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          expect.objectContaining({
+            content: expect.stringContaining('Decision clock (server supplied): 2026-09-05T12:00:00.000Z'),
+          }),
+        ],
+      }),
+    )
+    expect(invokeMock.mock.calls[0][0].messages[0].content).toContain(
+      'Document date',
+    )
+    expect(invokeMock.mock.calls[0][0].messages[0].content).toContain(
+      'Synthetic scorer summary.',
+    )
+  })
 })

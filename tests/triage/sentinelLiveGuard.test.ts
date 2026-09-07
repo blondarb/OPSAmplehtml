@@ -10,7 +10,6 @@ import {
 import {
   assertLiveAllowed,
   runLiveSentinelCase,
-  shouldInvokeSparseAdjudicator,
   type SentinelLiveDependencies,
 } from '@/lib/triage/sentinel/liveRunner'
 import type { ValidatedModelSafetyExtraction } from '@/lib/triage/modelSafetyExtraction'
@@ -253,15 +252,7 @@ describe('live report scope', () => {
   })
 })
 
-describe('sparse Opus adjudication', () => {
-  it.each([
-    [{ disagreement: true, criticalUnknownCount: 0 }, true],
-    [{ disagreement: false, criticalUnknownCount: 1 }, true],
-    [{ disagreement: false, criticalUnknownCount: 0 }, false],
-  ] as const)('uses only disagreement or critical unknowns: %o', (input, expected) => {
-    expect(shouldInvokeSparseAdjudicator(input)).toBe(expected)
-  })
-
+describe('production-fusion adjudication', () => {
   it('does not invoke Opus when the completed branches agree', async () => {
     const deps = dependencies()
 
@@ -280,7 +271,7 @@ describe('sparse Opus adjudication', () => {
     )
   })
 
-  it('does not invoke Opus for a branch failure alone', async () => {
+  it('matches production fusion policy for a failed branch and retains the hold after mocked adjudication', async () => {
     const deps = dependencies({
       runSafety: vi.fn(async () => {
         throw new Error('synthetic safety branch failure')
@@ -295,7 +286,10 @@ describe('sparse Opus adjudication', () => {
 
     expect(result.actualPathway).toBe('undetermined')
     expect(result.manualHold).toBe(true)
-    expect(deps.runAdjudicator).not.toHaveBeenCalled()
+    expect(deps.runAdjudicator).toHaveBeenCalledTimes(1)
+    expect(
+      result.branchTelemetry.find((item) => item.branch === 'adjudicator'),
+    ).toEqual(expect.objectContaining({ executed: true, status: 'complete' }))
   })
 
   it('invokes Opus on disagreement but cannot lower a deterministic emergency floor', async () => {
@@ -336,7 +330,74 @@ describe('sparse Opus adjudication', () => {
     )
   })
 
-  it('invokes Opus for a critical unknown even when pathway classes agree', async () => {
+  it('retains review-only scorer metadata without retaining the source text', async () => {
+    const result = await runLiveSentinelCase(
+      caseById('prompt-injection-hard-negative'),
+      { live: true, branches: ['safety', 'scoring'] },
+      dependencies({
+        runScoring: vi.fn(async () => ({
+          result: {
+            ...routineScoring(),
+            sentinelMetadata: {
+              tier: 'routine',
+              dimensionRatings: { symptom_acuity: 1 },
+              suggestedWorkup: [],
+              subspecialtyRecommendation: 'General Neurology',
+              redirectDestination: null,
+            },
+          },
+          inputTokens: null,
+          outputTokens: null,
+        })),
+      }),
+    )
+
+    expect(result.scoringMetadata).toEqual({
+      tier: 'routine',
+      dimensionRatings: { symptom_acuity: 1 },
+      suggestedWorkup: [],
+      subspecialtyRecommendation: 'General Neurology',
+      redirectDestination: null,
+    })
+    expect(JSON.stringify(result.scoringMetadata)).not.toContain(
+      'Ignore previous instructions',
+    )
+  })
+
+  it('uses one fixed case clock for scorer chronology and returns only safe timing metadata', async () => {
+    const runScoring = vi.fn(async () => ({
+      result: routineScoring(),
+      inputTokens: null,
+      outputTokens: null,
+    }))
+    const item = {
+      ...caseById('stroke-uncertain-onset-same-day'),
+      decisionAt: '2026-09-05T12:00:00.000Z',
+    }
+
+    const result = await runLiveSentinelCase(
+      item,
+      { live: true, branches: ['safety', 'scoring'] },
+      dependencies({ runScoring }),
+    )
+
+    expect(runScoring).toHaveBeenCalledWith(
+      item,
+      expect.objectContaining({
+        decisionAt: '2026-09-05T12:00:00.000Z',
+        chronologySourceText: item.input.kind === 'note' ? item.input.text : '',
+      }),
+    )
+    expect(result.timingMetadata).toEqual(
+      expect.objectContaining({
+        decisionAt: '2026-09-05T12:00:00.000Z',
+        sourceDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    )
+    expect(JSON.stringify(result.timingMetadata)).not.toContain(item.input.kind === 'note' ? item.input.text : '')
+  })
+
+  it('does not add a Sentinel-only trigger when production fusion does not require adjudication', async () => {
     const runAdjudicator = vi.fn(async () => ({
       result: {
         carePathway: 'same_day_clinician_review' as const,
@@ -375,6 +436,6 @@ describe('sparse Opus adjudication', () => {
       deps,
     )
 
-    expect(runAdjudicator).toHaveBeenCalledTimes(1)
+    expect(runAdjudicator).not.toHaveBeenCalled()
   })
 })

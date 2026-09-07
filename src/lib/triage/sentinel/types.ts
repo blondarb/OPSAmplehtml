@@ -58,6 +58,8 @@ export interface SentinelCase {
   hardNegative: boolean
   tags: string[]
   executionModes: SentinelExecutionMode[]
+  /** Fixed synthetic decision clock for reproducible chronology evaluation. */
+  decisionAt?: string
   input: SentinelInput
   expected: SentinelExpectation
 }
@@ -114,6 +116,27 @@ export interface SentinelCaseOutcome {
   signals: Array<GatewaySignal | SafetyModelSignal>
   evidenceValidation: SentinelEvidenceValidation
   branchTelemetry: SentinelBranchTelemetry[]
+  /** Review-only scorer details; source text is deliberately never retained. */
+  scoringMetadata: {
+    tier: string
+    dimensionRatings: Record<string, number>
+    suggestedWorkup: string[]
+    subspecialtyRecommendation: string
+    redirectDestination: string | null
+  } | null
+  timingMetadata: {
+    sourceDigest: string
+    decisionAt: string
+    decisionTimeZone: string | null
+    chronology: {
+      onset: string
+      lastVerifiedStatus: string
+      completedAssessment: string
+    }
+    actionRequirement: string
+    assessmentDeadlineState: string
+    issues: string[]
+  }
 }
 
 export interface SentinelRateMetric {

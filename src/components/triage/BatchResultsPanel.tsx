@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { BatchItem, TIER_DISPLAY } from '@/lib/triage/types'
+import { triageOutputPolicy } from '@/lib/triage/triageOutputPolicy'
 import TriageTierBadge from './TriageTierBadge'
 import PreVisitWorkup from './PreVisitWorkup'
 import FailedTherapiesList from './FailedTherapiesList'
@@ -68,6 +69,7 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
           const isExpanded = expandedId === item.id
           const result = item.triageResult
           const tierConfig = result ? TIER_DISPLAY[result.triage_tier] : null
+          const outputPolicy = result ? triageOutputPolicy(result) : null
 
           return (
             <div
@@ -145,11 +147,11 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                     )}
                   </span>
                 ) : result ? (
-                  <TriageTierBadge tier={result.triage_tier} compact />
+                  <TriageTierBadge tier={result.triage_tier} compact timeframeOverride={outputPolicy?.timeframe} />
                 ) : null}
 
                 {/* Subspecialty */}
-                {result && result.triage_tier !== 'insufficient_data' && (
+                {result && outputPolicy?.showOutpatientRouting && (
                   <span style={{
                     color: '#94a3b8',
                     fontSize: '0.75rem',
@@ -218,6 +220,7 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                       tier={result.triage_tier}
                       weightedScore={result.weighted_score}
                       isRedFlagOverride={result.red_flag_override}
+                      timeframeOverride={outputPolicy?.timeframe}
                     />
                     <div>
                       <span style={{
@@ -227,7 +230,7 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                       }}>
                         {result.confidence.charAt(0).toUpperCase() + result.confidence.slice(1)} Confidence
                       </span>
-                      {result.subspecialty_recommendation && (
+                      {outputPolicy?.showOutpatientRouting && result.subspecialty_recommendation && (
                         <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '4px 0 0' }}>
                           Route to: {result.subspecialty_recommendation}
                         </p>
@@ -274,7 +277,7 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                   )}
 
                   {/* Suggested workup */}
-                  <PreVisitWorkup workup={result.suggested_workup} />
+                  {outputPolicy?.showPreVisitWorkup && <PreVisitWorkup workup={result.suggested_workup} />}
 
                   {/* Failed therapies */}
                   <FailedTherapiesList therapies={result.failed_therapies} />

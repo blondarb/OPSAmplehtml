@@ -433,9 +433,7 @@ export class StatefulTriageProductionHarness {
 
     if (system.includes('neurology clinical decision support system')) {
       this.traceState.scoringModelPrompts.push(content)
-      if (!content.includes('resolved acute focal neurologic episode')) {
-        throw new Error('Scoring fixture received an unexpected extraction.')
-      }
+      this.assertCompleteSource(content)
       return {
         parsed: this.fixedTriageModelResult(),
         inputTokens: 420,
