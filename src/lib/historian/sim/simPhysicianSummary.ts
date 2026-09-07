@@ -14,7 +14,10 @@ import { invokeBedrockClinicalTool } from '@/lib/bedrock'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 import type { SimDifferential, SimPhysicianSummary } from '@/lib/historian/sim/simDifferential'
 
-const SUMMARY_MAX_TOKENS = 900
+// The 4 prose fields (esp. HPI + assessment) need real room; 900 truncated
+// (invokeBedrockClinicalTool fails closed on max_tokens). Its own request, so
+// there's budget up to the ~30s gateway.
+const SUMMARY_MAX_TOKENS = 1800
 
 const SUMMARY_SYSTEM_PROMPT = `You are a neurologist writing an in-depth physician summary of a completed patient intake, for a quality-review dashboard.
 
