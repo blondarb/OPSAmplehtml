@@ -6,9 +6,15 @@
  *   - the core session row (structured_output, narrative_summary, red_flags,
  *     transcript, duration, question_count, completion status)
  *   - the joined patient (name / mrn) when linked
- *   - the Localizer differential + reasoning, joined from neurology_consults
- *     (localizer_* columns), which is where the differential is persisted for
- *     consult-linked sessions (see api/ai/historian/localizer/route.ts).
+ *   - the Localizer differential + reasoning. Persisted two ways (see
+ *     api/ai/historian/localizer/route.ts): the neurology_consults
+ *     localizer_* columns for consult-linked sessions, and — regardless of
+ *     consult linkage — historian_localizer_results, keyed by session id
+ *     (migration 064). The consult value wins via COALESCE when both
+ *     exist; historian_localizer_results fills in standalone sessions
+ *     that never got a consult row. historian_localizer_results may not
+ *     exist yet (migration 064 applied manually, not on deploy) — the
+ *     query fails open to the consult-only columns on Postgres 42P01.
  *
  * Query params:
  *   ?id=<uuid>    — return a single run (full detail incl. transcript)
@@ -37,20 +43,71 @@ function coerceJson<T>(v: unknown): T | null {
   return v as T
 }
 
-const SELECT_COLUMNS = `
-  hs.*,
-  CASE WHEN p."id" IS NOT NULL THEN json_build_object(
-    'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
-  ) ELSE NULL END AS patient,
-  nc."id"                     AS consult_id,
+// withLocalizerResults selects whether the historian_localizer_results join
+// (migration 064) is included. When true, the consult's localizer_* value
+// wins over the session-keyed table via COALESCE (a linked consult with a
+// live localizer run is the more authoritative source); the session-keyed
+// table only fills in when the consult has none — e.g. a standalone
+// /patient/historian session with no consult row at all. The caller retries
+// with withLocalizerResults=false on Postgres 42P01 if the table doesn't
+// exist yet (see queryRunsWithLocalizerFallback below).
+function selectColumns(withLocalizerResults: boolean): string {
+  const localizerColumns = withLocalizerResults
+    ? `
+  COALESCE(nc."localizer_differential", hlr."differential") AS localizer_differential,
+  COALESCE(nc."localizer_excluded",     hlr."excluded")     AS localizer_excluded,
+  COALESCE(nc."localizer_questions",    hlr."questions")    AS localizer_questions,
+  COALESCE(nc."localizer_hypothesis",   hlr."hypothesis")   AS localizer_hypothesis,
+  COALESCE(nc."localizer_kb_sources",   hlr."kb_sources")   AS localizer_kb_sources,
+  COALESCE(nc."localizer_last_run_at",  hlr."last_run_at")  AS localizer_last_run_at,
+  COALESCE(nc."localizer_run_count",    hlr."run_count")    AS localizer_run_count`
+    : `
   nc."localizer_differential" AS localizer_differential,
   nc."localizer_excluded"     AS localizer_excluded,
   nc."localizer_questions"    AS localizer_questions,
   nc."localizer_hypothesis"   AS localizer_hypothesis,
   nc."localizer_kb_sources"   AS localizer_kb_sources,
   nc."localizer_last_run_at"  AS localizer_last_run_at,
-  nc."localizer_run_count"    AS localizer_run_count
+  nc."localizer_run_count"    AS localizer_run_count`
+
+  return `
+  hs.*,
+  CASE WHEN p."id" IS NOT NULL THEN json_build_object(
+    'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
+  ) ELSE NULL END AS patient,
+  nc."id"                     AS consult_id,${localizerColumns}
 `
+}
+
+function localizerJoin(withLocalizerResults: boolean): string {
+  return withLocalizerResults
+    ? `LEFT JOIN "neurology_consults" nc ON nc."historian_session_id" = hs."id"
+      LEFT JOIN "historian_localizer_results" hlr ON hlr."session_id" = hs."id"::text`
+    : `LEFT JOIN "neurology_consults" nc ON nc."historian_session_id" = hs."id"`
+}
+
+// historian_localizer_results (migration 064) is applied manually by Steve
+// with psql, never automatically on deploy — so the join above may 404 as
+// Postgres 42P01 (undefined_table) in any environment where it hasn't run
+// yet. Retry once with the join dropped rather than failing the whole
+// dashboard; any other error still propagates.
+async function queryRunsWithLocalizerFallback(
+  pool: { query: (sql: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> },
+  buildSql: (withLocalizerResults: boolean) => string,
+  values: unknown[],
+): Promise<{ rows: Record<string, unknown>[] }> {
+  try {
+    return await pool.query(buildSql(true), values)
+  } catch (err: unknown) {
+    if ((err as { code?: string } | undefined)?.code === '42P01') {
+      console.info(
+        '[historian/runs] historian_localizer_results not available yet (migration 064 not applied) — falling back to consult-only localizer columns',
+      )
+      return await pool.query(buildSql(false), values)
+    }
+    throw err
+  }
+}
 
 function normaliseRow(row: Record<string, unknown>): Record<string, any> {
   return {
@@ -76,15 +133,15 @@ export async function GET(request: Request) {
     const pool = await getPool()
 
     if (id) {
-      const sql = `
-        SELECT ${SELECT_COLUMNS}
+      const buildSql = (withLocalizerResults: boolean) => `
+        SELECT ${selectColumns(withLocalizerResults)}
         FROM "historian_sessions" hs
         LEFT JOIN "patients" p ON p."id" = hs."patient_id"
-        LEFT JOIN "neurology_consults" nc ON nc."historian_session_id" = hs."id"
+        ${localizerJoin(withLocalizerResults)}
         WHERE hs."id" = $1
         LIMIT 1
       `
-      const { rows } = await pool.query(sql, [id])
+      const { rows } = await queryRunsWithLocalizerFallback(pool, buildSql, [id])
       if (rows.length === 0) {
         return NextResponse.json({ error: 'Run not found' }, { status: 404 })
       }
@@ -99,16 +156,16 @@ export async function GET(request: Request) {
     }
     values.push(limit)
 
-    const sql = `
-      SELECT ${SELECT_COLUMNS}
+    const buildSql = (withLocalizerResults: boolean) => `
+      SELECT ${selectColumns(withLocalizerResults)}
       FROM "historian_sessions" hs
       LEFT JOIN "patients" p ON p."id" = hs."patient_id"
-      LEFT JOIN "neurology_consults" nc ON nc."historian_session_id" = hs."id"
+      ${localizerJoin(withLocalizerResults)}
       ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
       ORDER BY hs."created_at" DESC
       LIMIT $${values.length}
     `
-    const { rows } = await pool.query(sql, values)
+    const { rows } = await queryRunsWithLocalizerFallback(pool, buildSql, values)
     const runs = (rows || []).map(normaliseRow)
 
     // Aggregate metrics — computed here so the dashboard renders instantly.

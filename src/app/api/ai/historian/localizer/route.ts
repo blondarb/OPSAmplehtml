@@ -21,7 +21,7 @@ import { buildAttendingTranscriptWindow, getAttendingConfig, isAttendingSafetyEs
 import { buildAttendingPrompt } from '@/lib/consult/attendingPrompt'
 import { sanitizeAttendingGaps } from '@/lib/consult/attendingSanitize'
 import { from } from '@/lib/db-query'
-import { getNeuroPlansPool } from '@/lib/db'
+import { getNeuroPlansPool, getPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { CONSULT_SCALE_DEFINITIONS, getAdministrationQuestions } from '@/lib/consult/scales/scale-library'
 import { namesDiagnosis } from '@/lib/consult/attendingSanitize'
@@ -247,7 +247,14 @@ function sanitizeExcluded(excluded: unknown): ExcludedDiagnosis[] {
  * Persist the latest localizer results to the neurology_consults table.
  * Non-fatal — if the consult record doesn't exist or the write fails, we log and move on.
  */
-async function persistLocalizerResults(
+// Logged once per process — the table is added by migration 064, applied
+// manually by Steve with psql (never automatically on deploy). Until then
+// every localizer run hits Postgres 42P01 (undefined_table) on the upsert
+// below; that is expected and must read as a quiet info line, not a
+// stream of per-run errors.
+let loggedMissingLocalizerResultsTable = false
+
+async function upsertSessionLocalizerResults(
   sessionId: string,
   differential: DifferentialEntry[],
   followUpQuestions: string[],
@@ -256,6 +263,66 @@ async function persistLocalizerResults(
   excluded: ExcludedDiagnosis[]
 ): Promise<void> {
   try {
+    const pool = await getPool()
+    await pool.query(
+      `INSERT INTO historian_localizer_results
+         (session_id, differential, excluded, questions, hypothesis, kb_sources, run_count, last_run_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, now())
+       ON CONFLICT (session_id) DO UPDATE SET
+         differential = EXCLUDED.differential,
+         excluded = EXCLUDED.excluded,
+         questions = EXCLUDED.questions,
+         hypothesis = EXCLUDED.hypothesis,
+         kb_sources = EXCLUDED.kb_sources,
+         run_count = historian_localizer_results.run_count + 1,
+         last_run_at = now()`,
+      [
+        sessionId,
+        JSON.stringify(differential),
+        JSON.stringify(excluded),
+        JSON.stringify(followUpQuestions),
+        localizationHypothesis,
+        JSON.stringify(kbSources ?? []),
+      ]
+    )
+  } catch (err: unknown) {
+    if ((err as { code?: string } | undefined)?.code === '42P01') {
+      if (!loggedMissingLocalizerResultsTable) {
+        loggedMissingLocalizerResultsTable = true
+        console.info('[localizer] historian_localizer_results not available yet')
+      }
+    } else {
+      console.error('[localizer] session-keyed persist failed (non-fatal)')
+    }
+  }
+}
+
+async function persistLocalizerResults(
+  sessionId: string,
+  differential: DifferentialEntry[],
+  followUpQuestions: string[],
+  localizationHypothesis: string,
+  kbSources: string[] | undefined,
+  excluded: ExcludedDiagnosis[]
+): Promise<void> {
+  // Always persist under the session id, regardless of consult linkage —
+  // see historian_localizer_results (migration 064). Kicked off in
+  // parallel with (not before) the consult-linked branch below — both
+  // writes are independent, and running them concurrently keeps this
+  // function's timing unchanged for callers that already relied on the
+  // consult branch starting immediately. upsertSessionLocalizerResults
+  // handles its own errors internally, so this is safe to await at the
+  // end without an unhandled-rejection risk.
+  const sessionUpsert = upsertSessionLocalizerResults(
+    sessionId,
+    differential,
+    followUpQuestions,
+    localizationHypothesis,
+    kbSources,
+    excluded
+  )
+
+  try {
     // Find the consult linked to this historian session
     const { data: consult } = await from('neurology_consults')
       .select('id, localizer_run_count')
@@ -263,7 +330,7 @@ async function persistLocalizerResults(
       .maybeSingle()
 
     if (!consult) {
-      // No linked consult — standalone historian session, nothing to update
+      // No linked consult — standalone historian session, nothing more to update
       return
     }
 
@@ -280,6 +347,8 @@ async function persistLocalizerResults(
       .eq('id', consult.id)
   } catch (err) {
     console.error('[localizer] Failed to persist results to neurology_consults:', err)
+  } finally {
+    await sessionUpsert
   }
 }
 

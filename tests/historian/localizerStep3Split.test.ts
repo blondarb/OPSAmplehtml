@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), persist: vi.fn() }))
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), persist: vi.fn(), sessionUpsert: vi.fn() }))
 vi.mock('@/lib/bedrock', () => ({ invokeBedrockJSON: mocks.invoke }))
-vi.mock('@/lib/db', () => ({ getNeuroPlansPool: vi.fn().mockResolvedValue({}) }))
+vi.mock('@/lib/db', () => ({
+  getNeuroPlansPool: vi.fn().mockResolvedValue({}),
+  // Session-keyed historian_localizer_results upsert (migration 064) —
+  // stubbed as always-succeeding here since this file's focus is the
+  // step3 split, not persistence; see localizerSessionPersistence.test.ts
+  // for the upsert/fail-open behavior itself.
+  getPool: vi.fn().mockResolvedValue({ query: mocks.sessionUpsert.mockResolvedValue({ rows: [] }) }),
+}))
 vi.mock('@/lib/db-query', () => ({ from: vi.fn(() => ({
   select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'synthetic-consult', localizer_run_count: 0 } }) }) }),
   update: mocks.persist.mockImplementation(() => ({ eq: async () => ({}) })),
@@ -43,6 +50,7 @@ beforeEach(() => {
   info = vi.spyOn(console, 'info').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   mocks.persist.mockClear()
+  mocks.sessionUpsert.mockClear()
   mocks.invoke.mockReset().mockImplementation(async opts => ({ parsed: opts.maxTokens === 500
     ? symptoms
     : opts.maxTokens === 300 ? steer : detail }))
