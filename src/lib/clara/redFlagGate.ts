@@ -261,6 +261,32 @@ const SUBACUTE_TIMEFRAME = new RegExp(
 const ACUTE_STROKE_OVERRIDE =
   /\b(?:code\s+stroke|stroke\s+alert|just\s+now|right\s+now|this\s+morning|today|tonight|(?:an?\s+|\d+\s+|few\s+)?(?:hour|minute)s?\s+ago|(?:within|in)\s+the\s+(?:last|past)\s+(?:(?:[a-z]+|\d+)\s+)?(?:hours?|days?|twenty[\s-]?four)|sudden(?:ly)?|acute(?:ly)?|(?:getting|got|becoming)\s+worse|worse(?:ning)?|progress(?:ing|ive)|deteriorat\w*|new\s+(?:deficit|symptom|weakness|onset)|woke\s+up\s+with|wake[\s-]?up\s+stroke|still\s+(?:seizing|unresponsive)|t\s*p\s*a|tnk|thrombolytic|thrombolysis|thrombectomy)\b/i
 
+/**
+ * Negated worsening (2026-09-07, sevaro-voice-agent #72 twin): "stable, not
+ * getting worse" / "no worsening" / "hasn't progressed" / "denies new deficit"
+ * are STABLE statements, but the bare acute/worsening tokens inside them
+ * hard-fired Gate-0 and vetoed the downgrade. One grammatical rule — a
+ * negator directly ahead of a worsening/acute token — not a phrase list.
+ * "not stable, getting worse" is untouched (the negator precedes "stable").
+ */
+const NEGATED_WORSENING =
+  /\b(?:not|no|never|isn'?t|hasn'?t|haven'?t|aren'?t|wasn'?t|without|denies|denied|nothing)\s+(?:been\s+|gotten\s+|getting\s+|really\s+|any\s+|noticeably\s+|significantly\s+)*(?:worse|worsen\w*|progress\w*|spread\w*|deteriorat\w*|declin\w*|sudden(?:ly)?|acute(?:ly)?|new\s+(?:deficit|weakness|numbness|symptoms?|onset))\b/gi
+/**
+ * A timing word right after a stability word ("stable right now", "unchanged
+ * today", "the same currently") says WHEN the status was assessed, not when
+ * the deficit began; the timing word must not read as an acute onset.
+ */
+const STATUS_TIMING =
+  /\b(stable|unchanged|same|baseline|no\s+change)\s+(?:right\s+now|now|today|tonight|currently|at\s+the\s+moment|at\s+this\s+time|this\s+morning)\b/gi
+
+/** Strip negated-worsening idioms and status-timing words before acute/worsening tests. */
+export function normalizeStabilityLanguage(text: string): { text: string; negatedWorsening: boolean } {
+  const negatedWorsening = NEGATED_WORSENING.test(text)
+  NEGATED_WORSENING.lastIndex = 0
+  const out = text.replace(NEGATED_WORSENING, ' ').replace(STATUS_TIMING, '$1')
+  return { text: out, negatedWorsening }
+}
+
 /** Negated imaging findings ("no hemorrhage", "without bleeding") — routine
  *  radiology-speak that must not count as an acute-emergency hit. */
 const NEGATED_FINDING =
@@ -279,11 +305,13 @@ export function isSubacuteStrokeReport(text: string): boolean {
   const flags = detectRedFlag(normalized)
   if (!flags.isRedFlag || flags.category !== 'stroke') return false
   if (!SUBACUTE_TIMEFRAME.test(normalized)) return false
-  if (ACUTE_STROKE_OVERRIDE.test(normalized)) return false
+  if (ACUTE_STROKE_OVERRIDE.test(normalizeStabilityLanguage(normalized).text)) return false
 
   // Any hit outside the stroke bank keeps the floor — after stripping the
   // negated-imaging idiom so "CT shows no hemorrhage" doesn't count.
-  const denegated = normalized.replace(NEGATED_FINDING, ' ')
+  // Also after the stability normalization: "stable right now" must not trip
+  // the acute bank's "right now" pattern.
+  const denegated = normalizeStabilityLanguage(normalized).text.replace(NEGATED_FINDING, ' ')
   const nonStrokeHit = RED_FLAG_BANKS.some(
     (bank) => bank.category !== 'stroke' && bank.patterns.some((p) => p.test(denegated)),
   )
@@ -340,7 +368,7 @@ const GUARD_NONSTROKE_CONDITION =
 
 /** Explicitly stable / unchanged / resolved. Required (with a confident > 24 h) to permit a downgrade. */
 const STABLE_SIGNAL =
-  /\b(?:stable|unchanged|no\s+change|no\s+new|baseline|resolved|back\s+to\s+(?:normal|baseline)|hasn'?t\s+changed|since\s+then\s+nothing)\b/i
+  /\b(?:stable|unchanged|no\s+change|no\s+new|baseline|resolved|back\s+to\s+(?:normal|baseline)|hasn'?t\s+changed|since\s+then\s+nothing|(?:the|about\s+the|still\s+the)\s+same)\b/i
 
 export interface StrokeDowngradeGuardResult {
   /** True → the caller MUST force the disposition back to EMERGENT. */
@@ -374,12 +402,16 @@ export function evaluateStrokeDowngradeGuard(
   // job is a DOWNGRADED STROKE; a named non-stroke syndrome is out of scope.
   if (GUARD_NONSTROKE_CONDITION.test(t)) return { forceEmergent: false, reason: null }
 
+  // "not getting worse" is a stable answer, not a worsening marker; "stable
+  // right now" is a status, not an onset. Applied to the worsening/stable
+  // tests only — uncertainty/fluctuation/wake-up read the raw text.
+  const stability = normalizeStabilityLanguage(t)
   const danger =
     (GUARD_UNCERTAINTY.test(t) && 'uncertain/hedged onset') ||
     (GUARD_FLUCTUATION.test(t) && 'fluctuating/relapsing course') ||
     (GUARD_WAKEUP.test(t) && 'wake-up / found-down (LKW may be in window)') ||
-    (GUARD_WORSENING.test(t) && 'worsening / new deficit')
-  const confidentSubacute = CONFIDENT_OVER_24H.test(t) && STABLE_SIGNAL.test(t)
+    (GUARD_WORSENING.test(stability.text) && 'worsening / new deficit')
+  const confidentSubacute = CONFIDENT_OVER_24H.test(t) && (STABLE_SIGNAL.test(stability.text) || stability.negatedWorsening)
 
   if (danger) return { forceEmergent: true, reason: `stroke downgrade vetoed — ${danger}` }
   if (!confidentSubacute)

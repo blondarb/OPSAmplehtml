@@ -338,3 +338,38 @@ describe('evaluateStrokeDowngradeGuard', () => {
     expect(veto('just calling to reschedule his appointment for next week, not sure when')).toBe(false)
   })
 })
+
+// 2026-09-07 (sevaro-voice-agent #72 twin): a negated worsening is a stable
+// statement; a timing word after a stability word is not an onset.
+describe('negated worsening / status timing', () => {
+  const base = 'two day history of left sided weakness, patient is in the ER. '
+  const stableAnswers = [
+    'stable, not getting worse',
+    'stable, not worse',
+    "stable, it hasn't gotten worse",
+    'unchanged, no worsening',
+    'stable, not progressing',
+    "isn't getting any worse",
+    'denies new deficit, stable',
+    'it is stable right now',
+    'stable today',
+    'the same currently',
+    'no change at the moment',
+  ]
+  for (const a of stableAnswers) {
+    it(`defers and permits the downgrade: "${a}"`, () => {
+      expect(isSubacuteStrokeReport(base + a)).toBe(true)
+      expect(evaluateStrokeDowngradeGuard(base + a, 'non-emergent').forceEmergent).toBe(false)
+    })
+  }
+  for (const a of ['not stable, getting worse', 'no, it is getting worse', 'stable at first but now worse', 'not sure, maybe worse', 'worse today', 'new weakness today']) {
+    it(`real worsening still vetoes: "${a}"`, () => {
+      const t = base + a
+      expect(!isSubacuteStrokeReport(t) || evaluateStrokeDowngradeGuard(t, 'non-emergent').forceEmergent).toBe(true)
+    })
+  }
+  it('bare "stable" still defers', () => { expect(isSubacuteStrokeReport(base + 'stable')).toBe(true) })
+  it('"started today" without a stability word is still acute', () => {
+    expect(isSubacuteStrokeReport('two day history of left sided weakness but a new episode started today')).toBe(false)
+  })
+})
