@@ -13,7 +13,7 @@
  */
 
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
-import type { SimDifferential } from '@/lib/historian/sim/simDifferential'
+import type { SimDifferential, SimPhysicianSummary } from '@/lib/historian/sim/simDifferential'
 
 interface Pool {
   query: (sql: string, params: unknown[]) => Promise<unknown>
@@ -31,6 +31,8 @@ export async function scoreAndPersistSimRun(opts: {
   transcript: HistorianTranscriptEntry[]
   /** Live path passes the stage-1 differential; scripted leaves it undefined so we generate it. */
   differential?: SimDifferential | null
+  /** In-depth physician summary (live path computes it in its own stage); merged onto the stored differential. */
+  physicianSummary?: SimPhysicianSummary | null
   batchId: string
   batchLabel: string | null
 }): Promise<ScoreSimResult> {
@@ -46,6 +48,11 @@ export async function scoreAndPersistSimRun(opts: {
   if (!differential) {
     const { generateSimDifferential } = await import('@/lib/historian/sim/simDifferential')
     differential = await generateSimDifferential(transcript, chiefComplaint)
+  }
+  // Merge the (separately-generated) physician summary onto the differential
+  // object so it persists + renders under final_differential.physician_summary.
+  if (differential && opts.physicianSummary) {
+    differential = { ...differential, physician_summary: opts.physicianSummary }
   }
 
   // Thoroughness (non-fatal).
