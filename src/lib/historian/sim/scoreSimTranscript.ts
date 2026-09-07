@@ -33,6 +33,8 @@ export async function scoreAndPersistSimRun(opts: {
   differential?: SimDifferential | null
   /** In-depth physician summary (live path computes it in its own stage); merged onto the stored differential. */
   physicianSummary?: SimPhysicianSummary | null
+  /** Precomputed thoroughness (live path runs it in its own stage to fit the gateway). Scripted leaves it undefined so we generate it here. */
+  thoroughness?: { result: unknown; modelId: string | null; costUsd: number | null } | null
   batchId: string
   batchLabel: string | null
 }): Promise<ScoreSimResult> {
@@ -55,24 +57,27 @@ export async function scoreAndPersistSimRun(opts: {
     differential = { ...differential, physician_summary: opts.physicianSummary }
   }
 
-  // Thoroughness (non-fatal).
-  let thoroughnessResult: unknown = null
-  let thoroughnessModel: string | null = null
-  let thoroughnessCost: number | null = null
-  try {
-    const { generateThoroughnessEvaluationWithUsage } = await import('@/lib/historian/eval/thoroughnessJudge')
-    const { computeCostUsd } = await import('@/lib/historian/eval/constants')
-    const { evaluation, usage } = await generateThoroughnessEvaluationWithUsage(transcript, {
-      chiefComplaint,
-      syndrome: persona,
-      structuredOutput: null,
-      narrativeSummary: null,
-    })
-    thoroughnessResult = evaluation
-    thoroughnessModel = evaluation.provenance.model_id
-    thoroughnessCost = computeCostUsd(evaluation.provenance.model_id, usage)
-  } catch (err) {
-    console.error('[scoreSimTranscript] thoroughness failed (non-fatal):', err)
+  // Thoroughness — use the precomputed value (live path's own stage) if given;
+  // otherwise generate it here (scripted path, short fixture transcripts).
+  let thoroughnessResult: unknown = opts.thoroughness?.result ?? null
+  let thoroughnessModel: string | null = opts.thoroughness?.modelId ?? null
+  let thoroughnessCost: number | null = opts.thoroughness?.costUsd ?? null
+  if (!thoroughnessResult) {
+    try {
+      const { generateThoroughnessEvaluationWithUsage } = await import('@/lib/historian/eval/thoroughnessJudge')
+      const { computeCostUsd } = await import('@/lib/historian/eval/constants')
+      const { evaluation, usage } = await generateThoroughnessEvaluationWithUsage(transcript, {
+        chiefComplaint,
+        syndrome: persona,
+        structuredOutput: null,
+        narrativeSummary: null,
+      })
+      thoroughnessResult = evaluation
+      thoroughnessModel = evaluation.provenance.model_id
+      thoroughnessCost = computeCostUsd(evaluation.provenance.model_id, usage)
+    } catch (err) {
+      console.error('[scoreSimTranscript] thoroughness failed (non-fatal):', err)
+    }
   }
 
   // Ground-truth scoring (non-fatal).

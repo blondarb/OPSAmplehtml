@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       transcript,
       differential,
       physicianSummary: body?.physician_summary ?? null,
+      thoroughness: body?.thoroughness ?? null,
       batchId,
       batchLabel,
     })
