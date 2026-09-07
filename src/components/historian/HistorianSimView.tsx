@@ -595,12 +595,37 @@ function DifferentialTab({ run }: { run: Run }) {
   const excluded: any[] = Array.isArray(fd?.excluded) ? fd.excluded : []
   return (
     <div>
-      {fd?.summary && (
+      {fd?.physician_summary ? (
+        <>
+          <SubHead>Physician summary</SubHead>
+          {fd.physician_summary.one_liner && (
+            <p className="mb-2 text-sm font-medium leading-relaxed text-slate-100">{fd.physician_summary.one_liner}</p>
+          )}
+          {fd.physician_summary.hpi && (
+            <div className="mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">HPI</div>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{fd.physician_summary.hpi}</p>
+            </div>
+          )}
+          {fd.physician_summary.assessment && (
+            <div className="mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Assessment &amp; reasoning</div>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{fd.physician_summary.assessment}</p>
+            </div>
+          )}
+          {fd.physician_summary.workup && (
+            <div className="mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Suggested workup</div>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{fd.physician_summary.workup}</p>
+            </div>
+          )}
+        </>
+      ) : fd?.summary ? (
         <>
           <SubHead>Physician summary</SubHead>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{fd.summary}</p>
         </>
-      )}
+      ) : null}
       <SubHead>Scored differential ({items.length})</SubHead>
       {items.length ? (
         <div className="space-y-2">
