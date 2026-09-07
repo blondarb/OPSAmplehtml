@@ -108,6 +108,28 @@ export function resolveEvaluationStatus(run: RunRow): string | null {
   return null
 }
 
+/** Auto-refresh window: how long after queuing a pending eval is worth polling for. */
+export const PENDING_POLL_WINDOW_MS = 15 * 60 * 1000
+/** Auto-refresh cadence while a recent pending eval exists. */
+export const PENDING_POLL_INTERVAL_MS = 15 * 1000
+
+/**
+ * True when some run has a post-interview eval still queued (worker hasn't
+ * replaced the `pending`/`queued` stub yet) AND that stub is recent enough
+ * to be worth polling for — an eval that never resolved past the worker's
+ * normal ~60-120s turnaround shouldn't poll forever.
+ */
+export function hasRecentPendingRun(runs: RunRow[], now: number = Date.now()): boolean {
+  return runs.some((run) => {
+    const record = run.final_differential
+    if (!record || (record.status !== 'pending' && record.status !== 'queued')) return false
+    const queuedAt = ('queued_at' in record ? record.queued_at : undefined) ?? run.created_at
+    if (!queuedAt) return false
+    const queuedAtMs = new Date(queuedAt).getTime()
+    return Number.isFinite(queuedAtMs) && now - queuedAtMs < PENDING_POLL_WINDOW_MS
+  })
+}
+
 interface Metrics {
   total: number
   completed: number
@@ -199,6 +221,22 @@ export default function HistorianRunsView() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Auto-refresh while a recent post-interview eval is still queued — the
+  // worker (HISTORIAN_EVAL_MODE=queue) replaces the pending stub ~60-120s
+  // after POST /save, and this view otherwise never re-fetches on its own.
+  useEffect(() => {
+    if (!hasRecentPendingRun(runs)) return undefined
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      if (!hasRecentPendingRun(runs)) {
+        clearInterval(interval)
+        return
+      }
+      void load()
+    }, PENDING_POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [runs, load])
 
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-8 text-slate-200">
@@ -337,7 +375,7 @@ function CompletionBadge({ status }: { status: RunRow['interview_completion_stat
   return <span className="rounded bg-slate-500/15 px-2 py-0.5 text-[11px] font-semibold text-slate-400">—</span>
 }
 
-function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) => void }) {
+export function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) => void }) {
   if (runs.length === 0) {
     return <div className="rounded-xl border border-slate-800 bg-slate-900/60 py-16 text-center text-slate-500">No runs found.</div>
   }
@@ -360,6 +398,8 @@ function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) =
             const rf = Array.isArray(run.red_flags) ? run.red_flags.length : 0
             const sources = resolveDifferentials(run)
             const ddx = (sources.find(({ source }) => source === 'final') ?? sources[0])?.entries.length ?? 0
+            const hasFinalSource = sources.some(({ source }) => source === 'final')
+            const finalStatus = run.final_differential?.status
             return (
               <tr
                 key={run.id}
@@ -377,6 +417,15 @@ function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) =
                     {rf > 0 && <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">{rf} red flag{rf > 1 ? 's' : ''}</span>}
                     {ddx > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300">{ddx} ddx</span>}
                     {run.safety_escalated && <span className="rounded bg-rose-600/25 px-1.5 py-0.5 text-[10px] font-semibold text-rose-200">escalated</span>}
+                    {!hasFinalSource && (finalStatus === 'pending' || finalStatus === 'queued') && (
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">analysis pending</span>
+                    )}
+                    {!hasFinalSource && finalStatus === 'error' && (
+                      <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">analysis failed</span>
+                    )}
+                    {!hasFinalSource && finalStatus === 'insufficient_transcript' && (
+                      <span className="rounded bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">no analysis (short transcript)</span>
+                    )}
                   </div>
                 </td>
               </tr>
