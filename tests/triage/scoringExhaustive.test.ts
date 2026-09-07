@@ -4,7 +4,14 @@ import {
   calculateTriageDecision,
   calculateTriageTier,
 } from '@/lib/triage/scoring'
-import type { AITriageResponse, DimensionScores } from '@/lib/triage/types'
+import type {
+  AITriageResponse,
+  CarePathway,
+  DimensionScores,
+  OutpatientTriageTier,
+  ReviewRequirement,
+  TriageTier,
+} from '@/lib/triage/types'
 
 const OUTPATIENT_RANK = {
   urgent: 0,
@@ -30,6 +37,9 @@ const BOOLEANS = [false, true] as const
  * 4-30 ms for all 25,000 vectors; ~99% of the runtime is the per-vector
  * `expect()` machinery. Hoisting scoring work would not help, so the
  * assertions were left verbatim and only the loop was partitioned.
+ *
+ * 2026-09-07: one reference-model assertion per vector was added (see
+ * `referenceOutputs` below). The original assertions are still verbatim.
  */
 const SLICES = SCORE_RANGE.flatMap((acuity) =>
   SCORE_RANGE.map((concern) => ({ acuity, concern })),
@@ -90,6 +100,169 @@ function response(input: {
 }
 
 /**
+ * Reference model of the outputs `calculateTriageDecision` and
+ * `calculateTriageTier` derive from one vector, written from the published
+ * constants rather than by calling the code under test.
+ *
+ * Added 2026-09-07 after an independent mutation check found two mutants of
+ * src/lib/triage/scoring.ts that survived every assertion in `checkSlice`:
+ * `reviewRequirement` hard-coded to 'clinician_confirmation', and
+ * `WEIGHTS.diagnostic_concern` 0.25 -> 0.20 (equivalently `mapScoreToTier`'s
+ * urgent cutoff 4.0 -> 4.5). Neither output was asserted — the floor checks
+ * and the semi-urgent rank inequality hold under both. Every expected value
+ * below cites the scoring.ts path it mirrors; none is a clinical judgement
+ * made in this file.
+ */
+
+/**
+ * `WEIGHTS` in src/lib/triage/scoring.ts: symptom_acuity 0.30,
+ * diagnostic_concern 0.25, rate_of_progression 0.20,
+ * functional_impairment 0.15, red_flag_presence 0.10 (sum 1.0).
+ *
+ * Kept in hundredths so the expectation is exact integer arithmetic and shares
+ * nothing with `calculateWeightedScore`'s float sum and its
+ * `Math.round(raw * 100) / 100` rounding. Both sides end as N / 100 for the
+ * same integer N, so `toStrictEqual` on the number is exact.
+ */
+const WEIGHT_HUNDREDTHS = {
+  symptom_acuity: 30,
+  diagnostic_concern: 25,
+  rate_of_progression: 20,
+  functional_impairment: 15,
+  red_flag_presence: 10,
+} as const
+
+/**
+ * `mapScoreToTier` in src/lib/triage/scoring.ts: >= 4.0 urgent,
+ * >= 3.0 semi_urgent, >= 2.5 routine_priority, >= 1.5 routine, else
+ * non_urgent — expressed in hundredths of the weighted score. The four
+ * cutoffs are exactly representable doubles, so the integer comparison agrees
+ * with the float comparison on every reachable score.
+ */
+function referenceBaseTier(weightedHundredths: number): OutpatientTriageTier {
+  if (weightedHundredths >= 400) return 'urgent'
+  if (weightedHundredths >= 300) return 'semi_urgent'
+  if (weightedHundredths >= 250) return 'routine_priority'
+  if (weightedHundredths >= 150) return 'routine'
+  return 'non_urgent'
+}
+
+interface Vector {
+  acuity: number
+  concern: number
+  progression: number
+  impairment: number
+  redFlag: number
+  emergentOverride: boolean
+  insufficientData: boolean
+  redFlagOverride: boolean
+}
+
+/**
+ * The derived outputs pinned per vector. `vector` is a label, not an
+ * observation: it makes a failing diff name the exact vector, which the
+ * it.each title (acuity, concern) alone cannot.
+ */
+interface DerivedOutputs {
+  vector: string
+  weightedScore: number
+  outpatientPriority: OutpatientTriageTier
+  carePathway: CarePathway
+  reviewRequirement: ReviewRequirement
+  tier: TriageTier
+  tierWeightedScore: number | null
+}
+
+function vectorLabel(v: Vector): string {
+  return (
+    `acuity=${v.acuity} concern=${v.concern} progression=${v.progression} ` +
+    `impairment=${v.impairment} redFlag=${v.redFlag} ` +
+    `emergentOverride=${v.emergentOverride} ` +
+    `insufficientData=${v.insufficientData} ` +
+    `redFlagOverride=${v.redFlagOverride}`
+  )
+}
+
+function referenceOutputs(v: Vector): DerivedOutputs {
+  const weightedHundredths =
+    v.acuity * WEIGHT_HUNDREDTHS.symptom_acuity +
+    v.concern * WEIGHT_HUNDREDTHS.diagnostic_concern +
+    v.progression * WEIGHT_HUNDREDTHS.rate_of_progression +
+    v.impairment * WEIGHT_HUNDREDTHS.functional_impairment +
+    v.redFlag * WEIGHT_HUNDREDTHS.red_flag_presence
+  const weightedScore = weightedHundredths / 100
+  const baseTier = referenceBaseTier(weightedHundredths)
+
+  // `computeAppliedFloors` (scoring.ts): urgent floors are red_flag_override,
+  // red_flag_presence >= 4, and a 5 in symptom_acuity, diagnostic_concern or
+  // rate_of_progression; semi-urgent floors are symptom_acuity >= 4 and
+  // diagnostic_concern >= 4. functional_impairment has no floor.
+  const urgentFloor =
+    v.redFlagOverride ||
+    v.redFlag >= 4 ||
+    v.acuity === 5 ||
+    v.concern === 5 ||
+    v.progression === 5
+  const semiUrgentFloor = v.acuity >= 4 || v.concern >= 4
+
+  // `calculateTriageDecision` (scoring.ts): an urgent floor applies
+  // moreUrgentOutpatientTier(base, 'urgent'), which is always 'urgent'. A
+  // semi-urgent floor alone applies moreUrgentOutpatientTier(base,
+  // 'semi_urgent'), which keeps the base tier when it already ranks at or
+  // above semi_urgent (OUTPATIENT_ORDER.indexOf(a) <= indexOf(b) ? a : b) and
+  // otherwise raises it to semi_urgent. No floor leaves the base tier alone.
+  const outpatientPriority: OutpatientTriageTier = urgentFloor
+    ? 'urgent'
+    : semiUrgentFloor
+      ? OUTPATIENT_RANK[baseTier] <= OUTPATIENT_RANK.semi_urgent
+        ? baseTier
+        : 'semi_urgent'
+      : baseTier
+
+  // `calculateTriageDecision` (scoring.ts): emergent_override ->
+  // 'emergency_now'; else urgent or semi_urgent -> 'expedited_outpatient';
+  // else 'routine_outpatient'.
+  const carePathway: CarePathway = v.emergentOverride
+    ? 'emergency_now'
+    : outpatientPriority === 'urgent' || outpatientPriority === 'semi_urgent'
+      ? 'expedited_outpatient'
+      : 'routine_outpatient'
+
+  // `calculateTriageDecision` (scoring.ts): reviewRequirement reads ONLY
+  // emergent_override (emergent_override ? 'emergency_action' :
+  // 'clinician_confirmation'). insufficient_data feeds dataQuality and
+  // red_flag_override feeds the floors; neither participates here, so this
+  // pin deliberately does not vary with them.
+  const reviewRequirement: ReviewRequirement = v.emergentOverride
+    ? 'emergency_action'
+    : 'clinician_confirmation'
+
+  // `calculateTriageTier` (scoring.ts): emergent_override returns tier
+  // 'emergent' with a null weightedScore before any scoring. insufficient_data
+  // with an EMPTY appliedFloors returns 'insufficient_data' with a null
+  // weightedScore; appliedFloors is empty exactly when no urgent and no
+  // semi-urgent floor fired. Otherwise the tier is the decision's
+  // outpatientPriority and the weightedScore is the decision's.
+  const tier: TriageTier = v.emergentOverride
+    ? 'emergent'
+    : v.insufficientData && !urgentFloor && !semiUrgentFloor
+      ? 'insufficient_data'
+      : outpatientPriority
+  const tierWeightedScore =
+    tier === 'emergent' || tier === 'insufficient_data' ? null : weightedScore
+
+  return {
+    vector: vectorLabel(v),
+    weightedScore,
+    outpatientPriority,
+    carePathway,
+    reviewRequirement,
+    tier,
+    tierWeightedScore,
+  }
+}
+
+/**
  * Checks every vector with the given symptom_acuity and diagnostic_concern.
  * Returns the number of vectors checked so the caller can pin the slice size.
  */
@@ -102,6 +275,16 @@ function checkSlice(acuity: number, concern: number): number {
         for (const emergentOverride of BOOLEANS) {
           for (const insufficientData of BOOLEANS) {
             for (const redFlagOverride of BOOLEANS) {
+              const vector: Vector = {
+                acuity,
+                concern,
+                progression,
+                impairment,
+                redFlag,
+                emergentOverride,
+                insufficientData,
+                redFlagOverride,
+              }
               const input = response({
                 dimensionScores: scores(
                   acuity,
@@ -115,8 +298,25 @@ function checkSlice(acuity: number, concern: number): number {
                 redFlagOverride,
               })
               const decision = calculateTriageDecision(input)
-              const tier = calculateTriageTier(input).tier
+              const result = calculateTriageTier(input)
+              const tier = result.tier
               checked += 1
+
+              // Reference-model pin of every derived output (see
+              // `referenceOutputs`). One assertion per vector keeps the added
+              // cost at roughly one expect() call; the original assertions
+              // below are unchanged.
+              const expected = referenceOutputs(vector)
+              const observed: DerivedOutputs = {
+                vector: expected.vector,
+                weightedScore: decision.weightedScore,
+                outpatientPriority: decision.outpatientPriority,
+                carePathway: decision.carePathway,
+                reviewRequirement: decision.reviewRequirement,
+                tier,
+                tierWeightedScore: result.weightedScore,
+              }
+              expect(observed).toStrictEqual(expected)
 
               expect(decision.schedulingLocked).toBe(true)
               expect(decision.dataQuality).toBe(
