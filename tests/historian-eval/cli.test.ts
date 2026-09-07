@@ -313,6 +313,7 @@ describe('runHistorianEvalCli', () => {
             deterministic: {
               diagnosisLeak: { leaked: false, matches: [] },
               phaseMarkers: { openingPresent: false, closingPresent: false },
+              falseClosings: { count: 0, turnIndexes: [] },
               turnCap: { patientTurnCount: 1, limit: 25, exceeded: false },
               structuredOutput: { valid: false, issues: [] },
               criticalCoverage: [],
