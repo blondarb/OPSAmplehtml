@@ -1,3 +1,4 @@
+import { withClinicalTimingAction, type ClinicalTimingV1 } from './clinicalTiming'
 import { getPool } from '@/lib/db'
 import type { EmergencyGatewayResult } from './emergencyGateway'
 import type { CarePathway, DataQuality, ReviewRequirement } from './types'
@@ -27,6 +28,7 @@ const FLAT_SAFETY_KEYS = [
   'adjudicator',
   'adjudicatorFailure',
   'persistedCarePathwayFloor',
+  'clinicalTiming',
 ] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -142,6 +144,7 @@ export async function persistEmergencyGatewayResult(
   tenantId: string,
   gateway: PersistableEmergencyGatewayResult,
   processingAttemptCount: number,
+  clinicalTiming?: ClinicalTimingV1,
 ): Promise<boolean> {
   const pool = await getPool()
   const client = await pool.connect()
@@ -209,6 +212,7 @@ export async function persistEmergencyGatewayResult(
     const shadowResult = mergeFlatSafetySnapshot(workflow.safety_shadow_result, {
       deterministicGateway: gateway,
       persistedCarePathwayFloor: carePathway,
+      ...(clinicalTiming ? { clinicalTiming: withClinicalTimingAction(clinicalTiming, carePathway, reviewRequirement) } : {}),
     })
 
     const updateResult = await client.query(

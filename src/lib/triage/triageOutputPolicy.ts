@@ -1,4 +1,5 @@
-import { TIER_DISPLAY, type TriageResult } from './types'
+import { type TriageResult } from './types'
+import { dispositionPresentation } from './dispositionPresentation'
 
 export interface TriageOutputPolicy {
   showPreVisitWorkup: boolean
@@ -10,6 +11,7 @@ export interface TriageOutputPolicy {
   insufficientDataHold: boolean
   requiresHumanReviewHold: boolean
   schedulingLocked: boolean
+  immediateReview: boolean
 }
 
 export const DATA_CONFLICT_INFORMATION =
@@ -66,25 +68,32 @@ export function triageOutputPolicy(
     result.triage_tier === 'insufficient_data'
   const requiresHumanReviewHold =
     anyEmergencyMarker ||
+    result.care_pathway === 'same_day_clinician_review' ||
+    result.review_requirement === 'immediate_clinician_review' ||
     safetyConflict ||
     dataConflict ||
     insufficientDataHold
-  const timeframe = anyEmergencyMarker
-    ? 'Emergency evaluation now'
-    : result.care_pathway === 'same_day_clinician_review'
-      ? 'Same-day clinician review'
-      : TIER_DISPLAY[result.triage_tier].timeframe
+  const immediateReview = !anyEmergencyMarker &&
+    (result.care_pathway === 'same_day_clinician_review' ||
+      result.review_requirement === 'immediate_clinician_review')
+  const { timeframe } = dispositionPresentation({
+    tier: result.triage_tier,
+    carePathway: result.care_pathway,
+    reviewRequirement: result.review_requirement,
+    emergentOverride: result.emergent_override,
+  })
 
   return {
     showPreVisitWorkup:
-      !anyEmergencyMarker && !dataConflict && !insufficientDataHold,
+      !requiresHumanReviewHold,
     showOutpatientRouting:
-      !anyEmergencyMarker && !dataConflict && !insufficientDataHold,
+      !requiresHumanReviewHold,
     showMissingInformation:
       Boolean(result.missing_information?.length) ||
       dataConflict ||
       insufficientDataHold,
     timeframe,
+    immediateReview,
     safetyConflict,
     dataConflict,
     insufficientDataHold,

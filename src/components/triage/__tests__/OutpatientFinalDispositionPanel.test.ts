@@ -200,7 +200,7 @@ describe('OutpatientFinalDispositionPanel', () => {
     expect(html).not.toContain('Finalize outpatient disposition')
   })
 
-  it('renders same-day workup as non-blocking and keeps missing information visible', () => {
+  it('keeps immediate review active and suppresses outpatient workup while missing information remains visible', () => {
     const html = renderToStaticMarkup(
       createElement(TriageOutputPanel, {
         result: safeResult({
@@ -220,13 +220,13 @@ describe('OutpatientFinalDispositionPanel', () => {
       }),
     )
 
-    expect(html).toContain('Same-day clinician review')
+    expect(html).toContain('Clinician review now — do not defer until later today')
     expect(html).not.toContain('Within 1 Week')
-    expect(html).toContain('Non-blocking workup')
-    expect(html).toContain(
-      'must not delay same-day clinician review',
-    )
-    expect(html).toContain('Synthetic same-day non-blocking test.')
+    expect(html).not.toContain('Suggested Pre-Visit Workup')
+    expect(html).not.toContain('Non-blocking workup')
+    expect(html).not.toContain('Synthetic same-day non-blocking test.')
+    expect(html).not.toContain('Subspecialty Routing')
+    expect(html).toContain('Scheduling remains locked.')
     expect(html).toContain('Synthetic anticoagulation status is missing.')
     expect(html).not.toContain('Insufficient Data')
   })
@@ -361,7 +361,7 @@ describe('OutpatientFinalDispositionPanel', () => {
     expect(html).not.toContain('Finalize outpatient disposition')
   })
 
-  it('keeps same-day review visible while insufficient data suppresses every outpatient action', () => {
+  it('keeps immediate review visible while insufficient data suppresses every outpatient action', () => {
     const html = renderToStaticMarkup(
       createElement(TriageOutputPanel, {
         result: safeResult({
@@ -380,7 +380,8 @@ describe('OutpatientFinalDispositionPanel', () => {
       }),
     )
 
-    expect(html).toContain('Same-day clinician review')
+    expect(html).toContain('Clinician review now — do not defer until later today')
+    expect(html).toContain('Scheduling remains locked.')
     expect(html).toContain('Insufficient or undetermined data — human review hold')
     expect(html).toContain('Synthetic decision-critical detail is missing.')
     expect(html).not.toContain('Suggested Pre-Visit Workup')

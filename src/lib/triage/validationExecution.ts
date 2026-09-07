@@ -11,12 +11,12 @@ export async function executeValidation(input: TriageInput, scope: EvaluationSco
       const r = await dependencies.scorer(input)
       return {status:r.insufficient_data ? 'held' : 'complete',result:{...r,session_id:null,evaluation_scope:scope,scheduling_locked:true}}
     }
-    const item: SentinelCase = {id:'synthetic-validation',title:'Synthetic validation',synthetic:true,syndrome:null,hardNegative:false,tags:[],executionModes:['live_ensemble'],
+    const item: SentinelCase = {id:'synthetic-validation',title:'Synthetic validation',synthetic:true,syndrome:null,hardNegative:false,tags:[],executionModes:['live_ensemble'],decisionAt:input.decisionAt,
       input:{kind:'note',text:input.referral_text,sourceStyle:'standard'},
       // These placeholders are never included in results or used as accuracy labels.
       expected:{clinicalClass:'manual_hold',pathway:'undetermined',acceptablePathways:[],requiredSyndromes:[]}}
     const r=await dependencies.ensemble(item,{live:true,branches:['safety','scoring','adjudicator']})
-    return {status:r.actualPathway==='undetermined'||r.branchTelemetry.some(b=>b.status==='failed') ? 'held':'complete',result:{care_pathway:r.actualPathway,scheduling_locked:true,signals:r.signals,evidence:r.evidenceValidation,branches:r.branchTelemetry,evaluation_scope:scope}}
+    return {status:r.actualPathway==='undetermined'||r.branchTelemetry.some(b=>b.status==='failed') ? 'held':'complete',result:{care_pathway:r.actualPathway,scheduling_locked:true,signals:r.signals,evidence:r.evidenceValidation,branches:r.branchTelemetry,scoring_metadata:r.scoringMetadata,timing_metadata:r.timingMetadata,evaluation_scope:scope}}
   } catch (error) {
     const emergency = !!(error && typeof error==='object' && 'emergencyEnvelope' in error && (error.emergencyEnvelope as {emergentOverride?:boolean})?.emergentOverride)
     return {status:'error',result:{error:'evaluation_failed',care_pathway:emergency?'emergency_now':'undetermined',scheduling_locked:true}}

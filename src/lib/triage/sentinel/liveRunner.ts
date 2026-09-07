@@ -25,6 +25,8 @@ import type {
   SentinelCaseOutcome,
 } from './types'
 import type { BedrockTokenUsage } from '../../bedrock'
+import { deriveClinicalTiming, type ClinicalTimingV1 } from '../clinicalTiming'
+import { buildLongPacketAdjudicationText, longPacketPipelineToPersistedClinicalExtraction, safetyArtifactsFromValidatedPipeline } from '../longPacketIngestion'
 
 export type SentinelLiveBranch = 'safety' | 'scoring' | 'adjudicator'
 
@@ -45,6 +47,23 @@ export interface SentinelLiveInvocation<T> {
   outputTokens: number | null
 }
 
+/**
+ * Review-only scorer fields retained in a live sentinel outcome. They exclude
+ * the referral/source text so reports can inspect model behavior without
+ * re-emitting the evaluated packet.
+ */
+export interface SentinelScoringMetadata {
+  tier: string
+  dimensionRatings: Record<string, number>
+  suggestedWorkup: string[]
+  subspecialtyRecommendation: string
+  redirectDestination: string | null
+}
+
+type SentinelScoringState = TriageDecisionState & {
+  sentinelMetadata?: SentinelScoringMetadata
+}
+
 export interface SentinelLiveDependencies {
   models: TriageModelRegistry
   runSafety: (
@@ -52,7 +71,8 @@ export interface SentinelLiveDependencies {
   ) => Promise<SentinelLiveInvocation<ValidatedModelSafetyExtraction>>
   runScoring: (
     item: SentinelCase,
-  ) => Promise<SentinelLiveInvocation<TriageDecisionState>>
+    context: { decisionAt: string; chronologySourceText: string },
+  ) => Promise<SentinelLiveInvocation<SentinelScoringState>>
   runAdjudicator: (
     item: SentinelCase,
     context: {
@@ -85,19 +105,6 @@ export function assertLiveAllowed(options: SentinelLiveOptions): void {
       'Model-backed sentinel execution is disabled unless --live is explicitly supplied.',
     )
   }
-}
-
-export function shouldInvokeSparseAdjudicator(input: {
-  disagreement: boolean
-  criticalUnknownCount: number
-}): boolean {
-  if (
-    !Number.isSafeInteger(input.criticalUnknownCount) ||
-    input.criticalUnknownCount < 0
-  ) {
-    throw new Error('criticalUnknownCount must be a non-negative integer.')
-  }
-  return input.disagreement || input.criticalUnknownCount > 0
 }
 
 function packetSourceText(item: SentinelCase): string {
@@ -139,7 +146,7 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
     import('../longPacketModelPipeline'),
   ])
   const models = registryModule.resolveTriageModelRegistry()
-  const packetScoringSources = new Map<string, string>()
+  const packetBoundedRepresentations = new Map<string, string>()
 
   return {
     models,
@@ -179,47 +186,32 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
         item.input.chunkOptions,
       )
       const packet = await longPacketModule.runLongPacketModelPipeline(plan)
-      packetScoringSources.set(
-        item.id,
-        JSON.stringify({
-          narrative: packet.narrative,
-          factsByCategory: packet.factsByCategory,
-          conflicts: packet.conflicts,
-        }),
-      )
+      const gateway = scanLongPacketEmergency(plan)
+      const safetyArtifacts = safetyArtifactsFromValidatedPipeline({
+        pages: item.input.documents.flatMap(document => document.pages.map(page => ({ ...page, documentId: document.documentId }))),
+        gateway, pipeline: packet,
+      })
+      const safetyResult = safetyArtifacts.safetyResult
+      const clinical = longPacketPipelineToPersistedClinicalExtraction({ pipeline: packet, deterministicGateway: gateway })
+      const bounded = buildLongPacketAdjudicationText({
+        extractedSummary: clinical.extractedSummary, safetyArtifacts,
+      })
+      packetBoundedRepresentations.set(item.id, bounded)
       return {
         result: {
-          carePathway:
-            packet.carePathway === 'routine_outpatient' ||
-            packet.carePathway === 'expedited_outpatient' ||
-            packet.carePathway === 'redirect'
-              ? 'no_time_critical_signal'
-              : packet.carePathway,
-          dataQuality:
-            packet.conflicts.length > 0
-              ? 'conflicting'
-              : packet.coverageStatus === 'complete'
-                ? 'sufficient'
-                : packet.coverageStatus === 'partial'
-                  ? 'partial'
-                  : 'insufficient',
-          criticalUnknowns: [
-            ...packet.criticalUnknowns.map((unknown) => unknown.text),
-            ...packet.conflicts.map((conflict) => conflict.description),
-          ],
-          signals: packet.safetySignals,
+          ...safetyResult,
         },
         inputTokens: null,
         outputTokens: null,
       }
     },
-    async runScoring(item) {
+    async runScoring(item, context) {
       if (item.input.kind === 'missing') {
         throw new Error('Cannot score a referral without clinical text.')
       }
       const referralText =
         item.input.kind === 'packet'
-          ? packetScoringSources.get(item.id)
+          ? packetBoundedRepresentations.get(item.id)
           : item.input.text
       if (!referralText) {
         throw new Error(
@@ -231,6 +223,8 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
         {
           referral_text: referralText,
           model: models.outpatientScorer,
+          decisionAt: context.decisionAt,
+          chronologySourceText: context.chronologySourceText,
         },
         {
           onUsage: (observed) => {
@@ -261,6 +255,20 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
           schedulingLocked: true,
           weightedScore: result.weighted_score ?? 0,
           appliedFloors: [],
+          sentinelMetadata: {
+            tier: result.triage_tier,
+            dimensionRatings: Object.fromEntries(
+              Object.entries(result.dimension_scores).map(([dimension, value]) => [
+                dimension,
+                value.score,
+              ]),
+            ),
+            suggestedWorkup: result.suggested_workup,
+            subspecialtyRecommendation: result.subspecialty_recommendation,
+            redirectDestination: result.redirect_to_non_neuro
+              ? result.redirect_specialty
+              : null,
+          },
         },
         inputTokens: usage.inputTokens ?? null,
         outputTokens: usage.outputTokens ?? null,
@@ -269,7 +277,9 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
     async runAdjudicator(item, context) {
       let usage: BedrockTokenUsage = {}
       const result = await adjudicatorModule.runTriageAdjudicator(
-        packetSourceText(item),
+        item.input.kind === 'packet'
+          ? packetBoundedRepresentations.get(item.id) ?? (() => { throw new Error('Long-packet adjudication requires the validated safety/map branch to complete first.') })()
+          : packetSourceText(item),
         context,
         {
           model: models.adjudicator,
@@ -287,7 +297,7 @@ async function loadDefaultLiveDependencies(): Promise<SentinelLiveDependencies> 
   }
 }
 
-function deterministicGateway(item: SentinelCase): {
+function deterministicGateway(item: SentinelCase, decisionAt: string): {
   gateway: Pick<EmergencyGatewayResult, 'status' | 'carePathway'> & {
     failureCode: string | null
   }
@@ -319,7 +329,9 @@ function deterministicGateway(item: SentinelCase): {
     }
     const result =
       item.input.kind === 'note'
-        ? runEmergencyGateway(item.input.text)
+        ? runEmergencyGateway(item.input.text, {
+            decisionAsOf: decisionAt.slice(0, 10),
+          })
         : scanLongPacketEmergency(
             planLongPacketChunks(
               item.input.documents,
@@ -369,6 +381,26 @@ function deterministicGateway(item: SentinelCase): {
   }
 }
 
+function rawChronologySource(item: SentinelCase): string {
+  return packetSourceText(item)
+}
+
+function timingMetadata(timing: ClinicalTimingV1): SentinelCaseOutcome['timingMetadata'] {
+  return {
+    sourceDigest: timing.sourceDigest,
+    decisionAt: timing.decisionAt,
+    decisionTimeZone: timing.decisionTimeZone,
+    chronology: {
+      onset: timing.chronology.onset.state,
+      lastVerifiedStatus: timing.chronology.lastVerifiedStatus.state,
+      completedAssessment: timing.chronology.completedAssessment.state,
+    },
+    actionRequirement: timing.action.requirement,
+    assessmentDeadlineState: timing.assessmentDeadline.state,
+    issues: timing.issues,
+  }
+}
+
 function skippedTelemetry(
   branch: SentinelBranchTelemetry['branch'],
   modelId: string,
@@ -410,31 +442,6 @@ function invocationCost(
   )
 }
 
-function pathwayClass(pathway: string): 'emergency' | 'same_day' | 'quiet' | 'hold' {
-  if (pathway === 'emergency_now') return 'emergency'
-  if (pathway === 'same_day_clinician_review') return 'same_day'
-  if (pathway === 'undetermined') return 'hold'
-  return 'quiet'
-}
-
-function completedBranchDisagreement(input: {
-  gateway: ReturnType<typeof deterministicGateway>['gateway']
-  safety: ClinicalBranch<ValidatedModelSafetyExtraction>
-  scoring: ClinicalBranch<TriageDecisionState>
-}): boolean {
-  const classes: string[] = []
-  if (input.gateway.status === 'completed') {
-    classes.push(pathwayClass(input.gateway.carePathway))
-  }
-  if (input.safety.status === 'complete') {
-    classes.push(pathwayClass(input.safety.result.carePathway))
-  }
-  if (input.scoring.status === 'complete') {
-    classes.push(pathwayClass(input.scoring.result.carePathway))
-  }
-  return new Set(classes).size > 1
-}
-
 function scoringEmergencyOverrideFromError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false
   const envelope = Reflect.get(error, 'emergencyEnvelope')
@@ -452,7 +459,9 @@ export async function runLiveSentinelCase(
 ): Promise<SentinelCaseOutcome> {
   assertLiveAllowed(options)
   const deps = dependencies ?? (await loadDefaultLiveDependencies())
-  const deterministic = deterministicGateway(item)
+  const decisionAt = item.decisionAt ?? new Date().toISOString()
+  const chronologySourceText = rawChronologySource(item)
+  const deterministic = deterministicGateway(item, decisionAt)
   const branchTelemetry: SentinelBranchTelemetry[] = [deterministic.telemetry]
 
   let safetyBranch: ClinicalBranch<ValidatedModelSafetyExtraction> = {
@@ -507,7 +516,7 @@ export async function runLiveSentinelCase(
     )
   }
 
-  let scoringBranch: ClinicalBranch<TriageDecisionState> = {
+  let scoringBranch: ClinicalBranch<SentinelScoringState> = {
     status: 'failed',
     reason: 'branch_not_selected',
   }
@@ -515,7 +524,10 @@ export async function runLiveSentinelCase(
   if (options.branches.includes('scoring')) {
     const startedAt = performance.now()
     try {
-      const invocation = await deps.runScoring(item)
+      const invocation = await deps.runScoring(item, {
+        decisionAt,
+        chronologySourceText,
+      })
       scoringBranch = { status: 'complete', result: invocation.result }
       branchTelemetry.push({
         branch: 'outpatient_scorer',
@@ -567,24 +579,7 @@ export async function runLiveSentinelCase(
     scoringBranch,
     scoringEmergencyOverride,
   })
-  const disagreement = completedBranchDisagreement({
-    gateway: deterministic.gateway,
-    safety: safetyBranch,
-    scoring: scoringBranch,
-  })
-  const criticalUnknownCount =
-    safetyBranch.status === 'complete'
-      ? safetyBranch.result.criticalUnknowns.length
-      : 0
-  const sparseAdjudicationRequired = shouldInvokeSparseAdjudicator({
-    disagreement,
-    criticalUnknownCount,
-  })
-
-  if (
-    options.branches.includes('adjudicator') &&
-    sparseAdjudicationRequired
-  ) {
+  if (options.branches.includes('adjudicator') && fused.adjudicationRequired) {
     const startedAt = performance.now()
     try {
       const invocation = await deps.runAdjudicator(item, {
@@ -637,7 +632,7 @@ export async function runLiveSentinelCase(
         'adjudicator',
         deps.models.adjudicator,
         options.branches.includes('adjudicator')
-          ? 'sparse_policy_not_triggered'
+          ? 'fusion_policy_not_triggered'
           : 'branch_not_selected',
       ),
     )
@@ -659,6 +654,13 @@ export async function runLiveSentinelCase(
   ).every(
     (syndrome) => !signals.some((signal) => signal.syndrome === syndrome),
   )
+  const timing = deriveClinicalTiming({
+    sourceText: chronologySourceText,
+    decisionAt,
+    decisionTimeZone: 'UTC',
+    carePathway: fused.carePathway,
+    reviewRequirement: fused.reviewRequirement,
+  })
 
   return {
     caseId: item.id,
@@ -685,6 +687,11 @@ export async function runLiveSentinelCase(
     signals,
     evidenceValidation,
     branchTelemetry,
+    scoringMetadata:
+      scoringBranch.status === 'complete'
+        ? scoringBranch.result.sentinelMetadata ?? null
+        : null,
+    timingMetadata: timingMetadata(timing),
   }
 }
 
