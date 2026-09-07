@@ -174,11 +174,19 @@ export default function HistorianSimView() {
         { persona: livePersona, transcript: convo, differential: diff.differential },
         'Summary',
       )
-      const thor = await postJson(
-        '/api/ai/historian/sim/score/thoroughness',
-        { persona: livePersona, transcript: convo },
-        'Thoroughness',
-      )
+      // Thoroughness is best-effort: even the lean judge shouldn't be allowed
+      // to lose the whole run if it hiccups. Failure → run still scores.
+      let thoroughness: unknown = null
+      try {
+        const thor = await postJson(
+          '/api/ai/historian/sim/score/thoroughness',
+          { persona: livePersona, transcript: convo },
+          'Thoroughness',
+        )
+        thoroughness = thor.thoroughness ?? null
+      } catch {
+        // optional — continue without thoroughness
+      }
       await postJson(
         '/api/ai/historian/sim/score/finalize',
         {
@@ -186,7 +194,7 @@ export default function HistorianSimView() {
           transcript: convo,
           differential: diff.differential,
           physician_summary: sum.physician_summary,
-          thoroughness: thor.thoroughness,
+          thoroughness,
           batchId,
           batchLabel,
         },
