@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest'
 import {
   scanForDiagnosisLeak,
   checkPhaseMarkers,
+  countFalseClosings,
   checkTurnCap,
   checkStructuredOutputValidity,
   computeCriticalCoverage,
   runDeterministicChecks,
   DIAGNOSIS_LEAK_PATTERNS,
+  FALSE_CLOSING_PATTERNS,
+  FALSE_CLOSING_ISSUE_THRESHOLD,
   OPENING_SIGNAL_WORDS,
   CLOSING_SIGNAL_WORDS,
   PATIENT_TURN_CAP,
@@ -160,6 +163,108 @@ describe('checkPhaseMarkers (derived from the real PHASED_INTERVIEW_STRUCTURE im
     const result = checkPhaseMarkers([entry({ role: 'user', text: 'hello?' })])
     expect(result.openingPresent).toBe(false)
     expect(result.closingPresent).toBe(false)
+  })
+})
+
+describe('countFalseClosings (RULE 12 drift)', () => {
+  it('is a non-empty exported pattern list', () => {
+    expect(FALSE_CLOSING_PATTERNS.length).toBeGreaterThan(0)
+  })
+
+  it('reports zero false closings on a clean 6-turn fixture with no false-closing phrasing', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: 'Headaches for a week.' }),
+      entry({ role: 'assistant', text: 'How severe is the pain on a scale of 0 to 10?' }),
+      entry({ role: 'user', text: 'About a 6.' }),
+      entry({ role: 'assistant', text: 'Have you had any nausea or vomiting with the headaches?' }),
+      entry({ role: 'assistant', text: REAL_CLOSING_EXAMPLE }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(0)
+    expect(result.turnIndexes).toEqual([])
+  })
+
+  it('counts exactly one false closing for a single mid-interview "before we finish" turn, and runDeterministicChecks emits no issue for it (1 is expected from the preclose gate)', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: 'Headaches for a week.' }),
+      entry({
+        role: 'assistant',
+        text: 'Before we finish, I just want to double-check a couple more things about your history.',
+      }),
+      entry({ role: 'user', text: 'Sure, go ahead.' }),
+      entry({ role: 'assistant', text: REAL_CLOSING_EXAMPLE }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(1)
+    expect(result.turnIndexes).toEqual([2])
+
+    const structuredOutput = { chief_complaint: 'headache', hpi: 'One week of headaches.' }
+    const aggregate = runDeterministicChecks(transcript, structuredOutput, 'Patient reports a week of headaches.')
+    expect(aggregate.falseClosings.count).toBe(1)
+    expect(aggregate.issues.some((i) => i.includes('RULE 12 drift'))).toBe(false)
+  })
+
+  it('counts three false closings across "finally", "one last check", and "before we wrap up" in non-final turns, and runDeterministicChecks emits the RULE 12 drift issue', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: 'Headaches for a week.' }),
+      entry({ role: 'assistant', text: 'Finally, do you have any family history of migraines?' }),
+      entry({ role: 'user', text: 'My mother did.' }),
+      entry({ role: 'assistant', text: 'One last check — any recent head injuries?' }),
+      entry({ role: 'user', text: 'No.' }),
+      entry({ role: 'assistant', text: 'Before we wrap up, are you currently taking any medications?' }),
+      entry({ role: 'user', text: 'Just ibuprofen.' }),
+      entry({ role: 'assistant', text: REAL_CLOSING_EXAMPLE }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(3)
+    expect(result.turnIndexes).toEqual([2, 4, 6])
+
+    const structuredOutput = { chief_complaint: 'headache', hpi: 'One week of headaches.' }
+    const aggregate = runDeterministicChecks(transcript, structuredOutput, 'Patient reports a week of headaches.')
+    expect(aggregate.falseClosings.count).toBe(3)
+    expect(aggregate.issues).toContain(
+      `false closing phrases in 3 non-final assistant turns (RULE 12 drift; 1 is expected from the preclose gate)`,
+    )
+  })
+
+  it('does NOT count the final assistant turn even when it contains false-closing phrasing (it is the real closing)', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: 'Headaches for a week.' }),
+      entry({ role: 'assistant', text: "Okay, that's everything I needed. Thank you for your time." }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(0)
+    expect(result.turnIndexes).toEqual([])
+  })
+
+  it('does NOT count patient (user-role) turns containing false-closing phrasing', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: "Okay, one last thing before I forget — I also have a rash." }),
+      entry({ role: 'assistant', text: REAL_CLOSING_EXAMPLE }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(0)
+  })
+
+  it('matches case-insensitively', () => {
+    const transcript = [
+      entry({ role: 'assistant', text: REAL_OPENING_EXAMPLE }),
+      entry({ role: 'user', text: 'Headaches for a week.' }),
+      entry({ role: 'assistant', text: 'ONE LAST THING — any allergies?' }),
+      entry({ role: 'assistant', text: REAL_CLOSING_EXAMPLE }),
+    ]
+    const result = countFalseClosings(transcript)
+    expect(result.count).toBe(1)
+    expect(result.turnIndexes).toEqual([2])
+  })
+
+  it('FALSE_CLOSING_ISSUE_THRESHOLD is 2', () => {
+    expect(FALSE_CLOSING_ISSUE_THRESHOLD).toBe(2)
   })
 })
 

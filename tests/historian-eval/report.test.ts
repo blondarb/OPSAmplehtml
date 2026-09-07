@@ -82,6 +82,7 @@ function thoroughnessEvaluation(overrides: Partial<ThoroughnessEvaluation> = {})
     deterministic: {
       diagnosisLeak: { leaked: false, matches: [] },
       phaseMarkers: { openingPresent: true, closingPresent: true },
+      falseClosings: { count: 0, turnIndexes: [] },
       turnCap: { patientTurnCount: 5, limit: 25, exceeded: false },
       structuredOutput: { valid: false, issues: ['structured_output is missing'] },
       criticalCoverage: [],
@@ -304,6 +305,7 @@ describe('buildHistorianEvalReport + formatHistorianEvalMarkdown', () => {
             deterministic: {
               diagnosisLeak: { leaked: true, matches: [{ turnIndex: 2, phrase: 'you have migraine', label: 'you have' }] },
               phaseMarkers: { openingPresent: true, closingPresent: true },
+              falseClosings: { count: 0, turnIndexes: [] },
               turnCap: { patientTurnCount: 5, limit: 25, exceeded: false },
               structuredOutput: { valid: false, issues: [] },
               criticalCoverage: [],
