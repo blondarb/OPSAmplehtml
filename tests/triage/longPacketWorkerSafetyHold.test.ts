@@ -165,6 +165,15 @@ async function mapperOutcome() {
     onMapperOutcome: async (outcome) => {
       captured ??= outcome
     },
+    reduceNarrative: async (input) => ({
+      narrative: 'Synthetic durable mapper narrative.',
+      timelineNarrative: '',
+      medicationNarrative: '',
+      testNarrative: '',
+      functionalNarrative: '',
+      conflictNarrative: '',
+      preservedSafetyEvidenceIds: input.requiredSafetyEvidenceIds,
+    }),
   })
   return { packet, outcome: captured! }
 }

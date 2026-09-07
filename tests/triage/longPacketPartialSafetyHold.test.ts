@@ -308,6 +308,15 @@ async function captureSafetyOutcome(
     onSafetyOutcome: async (outcome) => {
       if (outcome.chunkId === chunkId) captured = outcome
     },
+    reduceNarrative: async (input) => ({
+      narrative: 'Synthetic captured-outcome narrative.',
+      timelineNarrative: '',
+      medicationNarrative: '',
+      testNarrative: '',
+      functionalNarrative: '',
+      conflictNarrative: '',
+      preservedSafetyEvidenceIds: input.requiredSafetyEvidenceIds,
+    }),
   })
   return captured!
 }
