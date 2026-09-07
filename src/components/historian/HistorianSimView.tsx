@@ -162,16 +162,28 @@ export default function HistorianSimView() {
         await new Promise((r) => setTimeout(r, 350))
       }
 
-      // Scoring in two stages so neither request exceeds the ~30s gateway limit.
+      // Scoring in stages so no single request exceeds the ~30s gateway limit.
       setLiveStatus('scoring')
       const diff = await postJson(
         '/api/ai/historian/sim/score/differential',
         { persona: livePersona, transcript: convo },
         'Differential',
       )
+      const sum = await postJson(
+        '/api/ai/historian/sim/score/summary',
+        { persona: livePersona, transcript: convo, differential: diff.differential },
+        'Summary',
+      )
       await postJson(
         '/api/ai/historian/sim/score/finalize',
-        { persona: livePersona, transcript: convo, differential: diff.differential, batchId, batchLabel },
+        {
+          persona: livePersona,
+          transcript: convo,
+          differential: diff.differential,
+          physician_summary: sum.physician_summary,
+          batchId,
+          batchLabel,
+        },
         'Scoring',
       )
       setLiveStatus('done')

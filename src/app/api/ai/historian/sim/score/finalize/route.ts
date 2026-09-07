@@ -44,7 +44,15 @@ export async function POST(request: Request) {
     const { getPool } = await import('@/lib/db')
     const pool = await getPool()
     const { scoreAndPersistSimRun } = await import('@/lib/historian/sim/scoreSimTranscript')
-    const result = await scoreAndPersistSimRun({ pool, persona, transcript, differential, batchId, batchLabel })
+    const result = await scoreAndPersistSimRun({
+      pool,
+      persona,
+      transcript,
+      differential,
+      physicianSummary: body?.physician_summary ?? null,
+      batchId,
+      batchLabel,
+    })
 
     return NextResponse.json({ batchId, ok: result.ok, top1Hit: result.top1Hit })
   } catch (error: any) {

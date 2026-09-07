@@ -70,9 +70,10 @@ export interface SimDifferential {
 
 const SIM_MAX_ITEMS = 4
 const SIM_MAX_EXCLUDED = 4
-// Room for the differential + exclusions + the in-depth physician summary in
-// one call (still well under the ~30s gateway limit).
-const SIM_MAX_TOKENS = 2400
+// Kept lean so this single call stays well under the ~30s gateway limit. The
+// in-depth physician summary is a SEPARATE stage (simPhysicianSummary.ts) —
+// folding it in here reintroduced the 504.
+const SIM_MAX_TOKENS = 1500
 const MIN_PATIENT_TURNS = 2
 
 const SIM_DDX_SYSTEM_PROMPT = `You are a neurologist producing a concise differential diagnosis from a completed patient intake transcript, for a synthetic quality-review dashboard.
@@ -91,14 +92,8 @@ For each EXCLUDED condition (the key clinical reasoning — conditions a neurolo
 - diagnosis: the condition considered.
 - reason: ONE sentence on WHY it is ruled out (the specific absent feature or contradicting evidence, e.g. "no thunderclap onset or worst-headache-of-life, making SAH unlikely").
 
-For the physician_summary (an in-depth synthesis a neurologist reads at a glance):
-- one_liner: age/sex + the chief problem + the most salient context, in one sentence.
-- hpi: a narrative paragraph synthesizing the history actually gathered (onset, course, character, associated features, relevant PMH/meds/social) — clinical prose, not a bullet dump.
-- assessment: the clinical reasoning — name the leading diagnosis and why, then the key conditions ruled out and why (mirror the differential + excluded above). 2-4 sentences.
-- workup: suggested next steps (studies, labs, referral, monitoring). No drug doses. "" if nothing is warranted.
-
 Other rules:
-- summary: one short paragraph on the overall picture and the ranking (brief; the physician_summary is the in-depth version).
+- summary: one short paragraph on the overall picture and the ranking.
 - Base everything on what the patient/historian actually said — never invent findings. Do not include any quotes.`
 
 const SIM_DDX_SCHEMA = {
@@ -133,19 +128,9 @@ const SIM_DDX_SCHEMA = {
         required: ['diagnosis', 'reason'],
       },
     },
-    physician_summary: {
-      type: 'object',
-      properties: {
-        one_liner: { type: 'string' },
-        hpi: { type: 'string' },
-        assessment: { type: 'string' },
-        workup: { type: 'string' },
-      },
-      required: ['one_liner', 'hpi', 'assessment', 'workup'],
-    },
     summary: { type: 'string' },
   },
-  required: ['differential', 'excluded', 'physician_summary', 'summary'],
+  required: ['differential', 'excluded', 'summary'],
 } as const
 
 function numberedTranscript(transcript: HistorianTranscriptEntry[]): string {
@@ -178,7 +163,6 @@ export async function generateSimDifferential(
   const { parsed } = await invokeBedrockClinicalTool<{
     differential: unknown[]
     excluded: unknown[]
-    physician_summary: Record<string, unknown>
     summary: string
   }>({
     system: SIM_DDX_SYSTEM_PROMPT,
@@ -226,23 +210,13 @@ export async function generateSimDifferential(
     }))
     .filter((e) => e.diagnosis.length > 0)
 
-  const ps = parsed?.physician_summary
-  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
-  const physician_summary: SimPhysicianSummary | null =
-    ps && typeof ps === 'object'
-      ? {
-          one_liner: str(ps.one_liner),
-          hpi: str(ps.hpi),
-          assessment: str(ps.assessment),
-          workup: str(ps.workup),
-        }
-      : null
-
   return {
     differential,
     excluded,
     summary: typeof parsed?.summary === 'string' ? parsed.summary.trim() : '',
-    physician_summary,
+    // Generated separately (simPhysicianSummary.ts) so the differential call
+    // stays lean; merged onto this object at persist time.
+    physician_summary: null,
     provenance: { model_id: BEDROCK_MODEL, ...provenanceBase },
     status: 'ok',
   }
