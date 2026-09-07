@@ -288,7 +288,8 @@ export interface ValidatedLongPacketSafetyArtifacts {
   validatedPipeline?: LongPacketModelPipelineResult
 }
 
-function safetyArtifactsFromValidatedPipeline(input: {
+/** Shared projection after the pipeline has passed source/evidence validation. */
+export function safetyArtifactsFromValidatedPipeline(input: {
   pages: PersistedLongPacketSourcePage[]
   gateway: PersistableEmergencyGatewayResult
   pipeline: LongPacketModelPipelineResult

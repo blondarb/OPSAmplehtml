@@ -1,3 +1,4 @@
+import type { ClinicalTimingV1 } from './clinicalTiming'
 import { NEURO_SUBSPECIALTIES, type CarePathway, type SubspecialtyType } from './types'
 
 /**
@@ -38,6 +39,7 @@ export interface OrganizationRoutingRequest {
   urgency: OrganizationRoutingUrgency
   schedulingLocked: boolean
   preferredClinicalDestination: SubspecialtyType
+  clinicalTiming?: ClinicalTimingV1
 }
 
 export interface OrganizationRoutingProvenance {
@@ -56,6 +58,7 @@ export type OrganizationRoutingDecision =
       urgency: OrganizationRoutingUrgency
       schedulingLocked: boolean
       preferredClinicalDestination: SubspecialtyType
+      clinicalTiming?: ClinicalTimingV1
       localService: { serviceId: string; referralContactId: string }
       externalEscalationContactId: null
       provenance: readonly OrganizationRoutingProvenance[]
@@ -67,6 +70,7 @@ export type OrganizationRoutingDecision =
       urgency: OrganizationRoutingUrgency
       schedulingLocked: boolean
       preferredClinicalDestination: SubspecialtyType
+      clinicalTiming?: ClinicalTimingV1
       localService: null
       externalEscalationContactId: string
       provenance: readonly OrganizationRoutingProvenance[]
@@ -78,6 +82,7 @@ export type OrganizationRoutingDecision =
       urgency: OrganizationRoutingUrgency
       schedulingLocked: boolean
       preferredClinicalDestination: SubspecialtyType
+      clinicalTiming?: ClinicalTimingV1
       localService: null
       externalEscalationContactId: string | null
       provenance: readonly OrganizationRoutingProvenance[]
@@ -136,7 +141,7 @@ function sameCareState(
   request: OrganizationRoutingRequest,
 ): Pick<
   OrganizationRoutingDecision,
-  'tenantId' | 'carePathway' | 'urgency' | 'schedulingLocked' | 'preferredClinicalDestination'
+  'tenantId' | 'carePathway' | 'urgency' | 'schedulingLocked' | 'preferredClinicalDestination' | 'clinicalTiming'
 > {
   return {
     tenantId: request.tenantId,
@@ -144,6 +149,7 @@ function sameCareState(
     urgency: request.urgency,
     schedulingLocked: request.schedulingLocked,
     preferredClinicalDestination: request.preferredClinicalDestination,
+    ...(request.clinicalTiming ? { clinicalTiming: request.clinicalTiming } : {}),
   }
 }
 
@@ -295,6 +301,7 @@ export function applyHumanOrganizationRoutingOverride(
     urgency: decision.urgency,
     schedulingLocked: decision.schedulingLocked,
     preferredClinicalDestination: decision.preferredClinicalDestination,
+    ...(decision.clinicalTiming ? { clinicalTiming: decision.clinicalTiming } : {}),
   }
   const blocked = validConfigOrSafeDefault(request, config)
   if (blocked) return blocked

@@ -1,8 +1,11 @@
+import { triageOutputPolicy } from '@/lib/triage/triageOutputPolicy'
+import { projectClinicalTiming } from '@/lib/triage/clinicalTiming'
 import { NextResponse } from 'next/server'
 import { from } from '@/lib/db-query'
 import { DISCLAIMER_TEXT, type AITriageResponse, type TriageTier } from '@/lib/triage/types'
-import { formatTierDisplay, calculateTriageTier } from '@/lib/triage/scoring'
+import { calculateTriageTier } from '@/lib/triage/scoring'
 import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
+import { dispositionPresentation } from '@/lib/triage/dispositionPresentation'
 import { SOURCE_SAFETY_WORKFLOW_INCONSISTENT_REASON } from '@/lib/triage/pollSafetyState'
 
 // Poll endpoint for the async triage flow. POST /api/triage returns 202 +
@@ -152,6 +155,7 @@ export async function GET(
       scheduling_locked: data.scheduling_locked !== false,
       outpatient_finalization_allowed: outpatientFinalizationAllowed,
       safety_review: parseJSON(data.safety_shadow_result),
+    clinical_timing: projectClinicalTiming(parseJSON(data.safety_shadow_result), data.referral_text, data.care_pathway ?? 'undetermined', data.review_requirement ?? 'immediate_clinician_review'),
       ...pollSafety,
     })
   }
@@ -169,6 +173,7 @@ export async function GET(
       workflow_status: data.workflow_status ?? 'clinician_review',
       outpatient_finalization_allowed: outpatientFinalizationAllowed,
       safety_review: parseJSON(data.safety_shadow_result),
+    clinical_timing: projectClinicalTiming(parseJSON(data.safety_shadow_result), data.referral_text, data.care_pathway ?? 'undetermined', data.review_requirement ?? 'immediate_clinician_review'),
       outpatient_scoring_blocked: true,
       human_review_required: true,
       scheduling_locked: true,
@@ -177,30 +182,39 @@ export async function GET(
   }
 
   // status === 'complete' — return the same shape the synchronous POST used to.
-  // Reconstruct triage_tier_display from the persisted tier; cheaper than
-  // storing a redundant column.
+  // Reconstruct from the persisted clinical action as well as the legacy tier.
   const aiResponse = (parseJSON(data.ai_raw_response) ?? {}) as Partial<AITriageResponse>
   const tier = data.triage_tier as TriageTier | undefined
-  let triageTierDisplay = ''
-  if (tier) {
-    triageTierDisplay = formatTierDisplay(tier, !!aiResponse.red_flag_override)
-  } else if (aiResponse.dimension_scores) {
-    // Fallback — recompute tier from dimension_scores if for some reason
-    // the column write was skipped.
-    const recomputed = calculateTriageTier(aiResponse as AITriageResponse)
-    triageTierDisplay = recomputed.display
-  }
   const completedCarePathway = data.care_pathway ?? 'undetermined'
   const completedReviewRequirement =
     data.review_requirement ??
     (completedCarePathway === 'routine_outpatient'
       ? 'clinician_confirmation'
       : 'immediate_clinician_review')
+  const displayTier = tier ?? (aiResponse.dimension_scores
+    ? calculateTriageTier(aiResponse as AITriageResponse).tier
+    : 'insufficient_data')
+  const triageTierDisplay = dispositionPresentation({
+    tier: displayTier,
+    carePathway: completedCarePathway,
+    reviewRequirement: completedReviewRequirement,
+    emergentOverride: aiResponse.emergent_override,
+    redFlagOverride: aiResponse.red_flag_override,
+  }).display
 
+  const outputPolicy = triageOutputPolicy({
+    triage_tier: displayTier, care_pathway: completedCarePathway,
+    review_requirement: completedReviewRequirement,
+    emergent_override: aiResponse.emergent_override ?? false,
+    insufficient_data: aiResponse.insufficient_data ?? false,
+    data_quality: data.data_quality,
+    missing_information: parseJSON(data.missing_information) ?? [],
+    scheduling_locked: data.scheduling_locked,
+  })
   return NextResponse.json({
     session_id: id,
     status: 'complete',
-    triage_tier: tier,
+    triage_tier: displayTier,
     triage_tier_display: triageTierDisplay,
     confidence: data.confidence,
     dimension_scores: parseJSON(data.dimension_scores),
@@ -219,13 +233,13 @@ export async function GET(
     missing_information: parseJSON(data.missing_information) ?? [],
     clinical_reasons: parseJSON(data.clinical_reasons) ?? [],
     red_flags: parseJSON(data.red_flags) ?? [],
-    suggested_workup: parseJSON(data.suggested_workup) ?? [],
+    suggested_workup: outputPolicy.showPreVisitWorkup ? parseJSON(data.suggested_workup) ?? [] : [],
     failed_therapies: parseJSON(data.failed_therapies) ?? [],
-    subspecialty_recommendation: data.subspecialty_recommendation,
-    subspecialty_rationale: data.subspecialty_rationale,
-    redirect_to_non_neuro: aiResponse.redirect_to_non_neuro ?? false,
-    redirect_specialty: aiResponse.redirect_specialty ?? null,
-    redirect_rationale: aiResponse.redirect_rationale ?? null,
+    subspecialty_recommendation: outputPolicy.showOutpatientRouting ? data.subspecialty_recommendation : '',
+    subspecialty_rationale: outputPolicy.showOutpatientRouting ? data.subspecialty_rationale : '',
+    redirect_to_non_neuro: outputPolicy.showOutpatientRouting && (aiResponse.redirect_to_non_neuro ?? false),
+    redirect_specialty: outputPolicy.showOutpatientRouting ? aiResponse.redirect_specialty ?? null : null,
+    redirect_rationale: outputPolicy.showOutpatientRouting ? aiResponse.redirect_rationale ?? null : null,
     safety_anticoagulation: aiResponse.safety_anticoagulation ?? null,
     safety_symptom_onset_time: aiResponse.safety_symptom_onset_time ?? null,
     safety_allergies: aiResponse.safety_allergies ?? null,
@@ -244,6 +258,7 @@ export async function GET(
     scheduling_locked: data.scheduling_locked !== false,
     outpatient_finalization_allowed: outpatientFinalizationAllowed,
     safety_review: parseJSON(data.safety_shadow_result),
+    clinical_timing: projectClinicalTiming(parseJSON(data.safety_shadow_result), data.referral_text, data.care_pathway ?? 'undetermined', data.review_requirement ?? 'immediate_clinician_review'),
     ...pollSafety,
   })
 }

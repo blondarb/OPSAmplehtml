@@ -18,6 +18,10 @@ const gatesText = readFileSync(
   resolve(process.cwd(), 'qa/triage-sentinel/release-gates.json'),
   'utf8',
 )
+const clinicalPolicyCatalogText = readFileSync(
+  resolve(process.cwd(), 'qa/triage-sentinel/clinical-policy-cases.json'),
+  'utf8',
+)
 const catalog = parseSentinelCatalog(JSON.parse(catalogText))
 
 function runtime(): SentinelCliRuntime & {
@@ -62,6 +66,34 @@ describe('runSentinelCli', () => {
     expect(io.runLiveCase).not.toHaveBeenCalled()
     expect(io.stdoutLines.join('\n')).toContain('"clinicalValidationClaim": false')
     expect(io.stderrLines.join('\n')).toContain('SYNTHETIC')
+  })
+
+  it('loads the separate clinical-policy catalog without turning live-only probes into offline conclusions', async () => {
+    const io = runtime()
+    vi.mocked(io.readText).mockImplementation((path: string) => {
+      if (path.endsWith('clinical-policy-cases.json')) return clinicalPolicyCatalogText
+      if (path.endsWith('release-gates.json')) return gatesText
+      throw new Error(`Unexpected read ${path}`)
+    })
+
+    const result = await runSentinelCli(
+      [
+        '--offline',
+        '--catalog',
+        'qa/triage-sentinel/clinical-policy-cases.json',
+        '--format',
+        'json',
+        '--no-fail-on-gate',
+      ],
+      io,
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.report?.catalogId).toContain('clinical-policy-counterexamples')
+    expect(result.report?.metrics).toEqual(
+      expect.objectContaining({ totalCases: JSON.parse(clinicalPolicyCatalogText).cases.length, evaluatedCases: 0, unevaluatedCases: JSON.parse(clinicalPolicyCatalogText).cases.length }),
+    )
+    expect(io.runLiveCase).not.toHaveBeenCalled()
   })
 
   it('returns a release-gate exit code by default when the synthetic gate fails', async () => {

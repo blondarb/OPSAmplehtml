@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { deriveClinicalTiming } from '@/lib/triage/clinicalTiming'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -57,6 +59,23 @@ describe('organization service routing', () => {
         },
       ],
     })
+  })
+
+  it('C18 preserves the clinical action, source, clock, and deadline when availability changes', () => {
+    const sourceText = 'Synthetic MS scenario.\nSymptom onset: 2026-08-24T12:00:00Z'
+    const clinicalTiming = deriveClinicalTiming({ sourceText, decisionAt: '2026-09-05T12:00:00Z', decisionTimeZone: 'UTC', carePathway: 'expedited_outpatient', confirmedPolicy: { policyId: 'ms_relapse_assessment_treatment_window_v1', sourceDigest: createHash('sha256').update(sourceText).digest('hex'), confirmationId: 'synthetic-confirmation', confirmedAt: '2026-09-05T12:00:00Z' } })
+    expect(clinicalTiming.assessmentDeadline.state).toBe('established')
+    const clinicalRequest = { ...request, clinicalTiming }
+    const original = structuredClone(clinicalRequest)
+    const available = routeOrganizationService(clinicalRequest, tertiaryConfig)
+    const unavailable = routeOrganizationService(clinicalRequest, { ...tertiaryConfig, services: tertiaryConfig.services.map(service => ({ ...service, available: false })) })
+    expect(available.disposition).toBe('local_service_available')
+    expect(unavailable.disposition).toBe('external_escalation_required')
+    expect(available.clinicalTiming).toEqual(clinicalTiming)
+    expect(unavailable.clinicalTiming).toEqual(clinicalTiming)
+    expect(unavailable.urgency).toBe(available.urgency)
+    expect(unavailable.carePathway).toBe(available.carePathway)
+    expect(clinicalRequest).toEqual(original)
   })
 
   it('does not treat General Neurology as equivalent to a requested subspecialty', () => {

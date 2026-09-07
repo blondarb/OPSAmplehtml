@@ -744,7 +744,7 @@ describe('triage route access and initial safety state', () => {
           'Raw persisted source says sudden aphasia today and contains enough synthetic text for triage.',
         referral_text:
           'Raw persisted source says sudden aphasia today and contains enough synthetic text for triage.',
-        textForScoring: 'Persisted authoritative extraction summary.',
+        textForScoring: 'Raw persisted source says sudden aphasia today and contains enough synthetic text for triage.',
         patient_age: 68,
         patient_sex: 'Female',
         referring_provider_type: undefined,

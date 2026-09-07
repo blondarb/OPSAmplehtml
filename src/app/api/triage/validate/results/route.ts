@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authorizeValidationStudy } from '@/lib/triage/validationAccess'
 import { TriageTier } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
+import type { ClinicalAssessment, ValidationReview } from '@/lib/triage/validationTypes'
 
 // Ordered tiers for weighted calculations (0 = least urgent, 6 = most urgent)
 const TIER_ORDER: TriageTier[] = [
@@ -255,6 +256,45 @@ export async function GET(req: NextRequest) {
     reviewsByReviewer.set(r.reviewer_id, list)
   }
 
+  const clinicalAssessmentAnalysis = access.studyKind === 'legacy_archive' ? null : (() => {
+    type AssessedReview = ValidationReview & { clinical_assessment: ClinicalAssessment }
+    const assessed = (reviews as ValidationReview[]).filter((review): review is AssessedReview => review.clinical_assessment?.version === 'v1')
+    const assessedByCase = new Map<string, typeof assessed>()
+    for (const review of assessed) {
+      const list = assessedByCase.get(review.case_id) || []
+      list.push(review)
+      assessedByCase.set(review.case_id, list)
+    }
+    const compare = (signature: (review: AssessedReview) => string) => {
+      const groups = [...assessedByCase.values()].filter(group => group.length >= 2)
+      const casesInAgreement = groups.filter(group => group.every(review => signature(review) === signature(group[0]))).length
+      return {
+        cases_compared: groups.length,
+        cases_in_agreement: casesInAgreement,
+        disagreement_count: groups.length - casesInAgreement,
+        agreement_rate: groups.length ? Math.round((casesInAgreement / groups.length) * 1000) / 1000 : null,
+      }
+    }
+    return {
+      canonical_label: 'clinical_assessment_v1' as const,
+      reviewer_kind: requestedGroup,
+      clinical_validation_established: false as const,
+      ai_action_comparison: 'not_evaluated' as const,
+      coverage: {
+        submitted_reviews: reviews.length,
+        assessments_recorded: assessed.length,
+        cases_with_assessment: assessedByCase.size,
+        cases_with_two_or_more_assessments: [...assessedByCase.values()].filter(group => group.length >= 2).length,
+      },
+      action_agreement: compare(review => review.clinical_assessment.action),
+      timing_agreement: compare(review => {
+        const timing = review.clinical_assessment.latest_safe_assessment
+        return `${timing.origin}|${timing.interval?.value ?? ''}|${timing.interval?.unit ?? ''}|${timing.anchor ?? ''}`
+      }),
+      service_destination_agreement: compare(review => [...review.clinical_assessment.services].sort().join('|')),
+    }
+  })()
+
   // ── Build Fleiss' Kappa matrix ──
   const numCategories = TIER_ORDER.length
   // Only include cases where at least 2 reviewers have responded
@@ -408,11 +448,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const aiVsConsensus = {
+  const legacyAiVsConsensus = {
     agreement_rate: aiCompareCount > 0 ? aiAgreeCount / aiCompareCount : 0,
     weighted_kappa: aiRatings.length > 0 ? weightedKappa(aiRatings, consensusRatings, numCategories) : 0,
     cases_compared: aiCompareCount,
     disagreements: aiDisagreements,
+  }
+  const aiVsConsensus = access.studyKind === 'legacy_archive' ? legacyAiVsConsensus : {
+    agreement_rate: 0, weighted_kappa: 0, cases_compared: 0, disagreements: [],
   }
 
   // ── Redirect agreement ──
@@ -642,8 +685,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     study_name: studyName,
     phase: access.phase, study_kind: access.studyKind, reviewer_kind: access.studyKind === 'legacy_archive' ? 'historical_unknown' : requestedGroup,
-    ai_comparison_source: 'legacy_case_snapshot',
-    evidence_notice: 'Case snapshot comparisons are historical. Select an exact configuration revision via the evaluations endpoint for new append-only runs.',
+    ai_comparison_source: access.studyKind === 'legacy_archive' ? 'legacy_case_snapshot' : 'not_evaluated_for_clinical_assessment_v1',
+    evidence_notice: access.studyKind === 'legacy_archive'
+      ? 'Historical case snapshot comparisons are descriptive only.'
+      : 'Clinical assessment v1 is the canonical new human label. AI action/timing/service comparison has not been evaluated; legacy tier statistics are descriptive only.',
     total_cases: eligibleCases.length,
     total_cases_all: cases.length,
     total_reviewers: reviewerIds.length,
@@ -657,6 +702,7 @@ export async function GET(req: NextRequest) {
     tier_agreement: tierAgreement,
     pairwise,
     ai_vs_consensus: aiVsConsensus,
+    clinical_assessment_analysis: clinicalAssessmentAnalysis,
     ai_consistency: aiConsistency ?? null,
     model_comparison: modelComparison ?? null,
     redirect_agreement: {

@@ -1,3 +1,4 @@
+import { deriveClinicalTiming, withClinicalTimingAction } from './clinicalTiming'
 import { invokeBedrockClinicalTool } from '@/lib/bedrock'
 import { TRIAGE_SCORING_SCHEMA } from '@/lib/triage/scoringToolSchema'
 import { deriveChiefComplaint } from '@/lib/consult/contextBuilder'
@@ -18,6 +19,7 @@ import {
 } from '@/lib/triage/modelSafetyExtractor'
 import type { ValidatedModelSafetyExtraction } from '@/lib/triage/modelSafetyExtraction'
 import { persistModelSafetyFusion } from '@/lib/triage/modelSafetyPersistence'
+import { dispositionPresentation } from '@/lib/triage/dispositionPresentation'
 import { finalizeTriageAttempt } from '@/lib/triage/triageCompletionPersistence'
 import {
   runTriageAdjudicator,
@@ -28,7 +30,6 @@ import {
   calculateTriageDecision,
   calculateTriageTier,
   extractScoringEmergencyEnvelope,
-  formatTierDisplay,
   parseAndNormalizeAIResponse,
 } from '@/lib/triage/scoring'
 import {
@@ -76,9 +77,9 @@ function failedModelBranch(error: unknown): ClinicalBranch<never> {
 }
 
 export interface TriageBackgroundParams {
-  /** Complete raw source text used only by the deterministic safety gateway. */
+  /** Complete raw source text used by safety branches and source chronology. */
   gatewayText: string
-  /** Clinician-reviewed extraction or raw source used for model scoring. */
+  /** Full ordinary note or bounded source-grounded long-packet representation for scoring. */
   textForScoring: string
   patient_age?: number
   patient_sex?: string
@@ -94,6 +95,8 @@ export interface TriageBackgroundParams {
   precomputedSafetyResult?: ValidatedModelSafetyExtraction
   adjudicationText?: string
   processingAttemptCount?: number
+  /** Server decision clock captured once; never supplied by the model. */
+  decisionAt?: string
 }
 
 export async function processTriageInBackground(
@@ -102,15 +105,22 @@ export async function processTriageInBackground(
 ): Promise<void> {
   const processingAttemptCount = params.processingAttemptCount ?? 1
   try {
+    const decisionAt = params.decisionAt ?? new Date().toISOString()
     // The deterministic screen runs and is durably persisted before any model
     // call. A later LLM result may escalate it, but can never downgrade it.
     const emergencyGateway =
-      params.precomputedGateway ?? runEmergencyGateway(params.gatewayText)
+      params.precomputedGateway ?? runEmergencyGateway(params.gatewayText, { decisionAsOf: decisionAt.slice(0, 10) })
+    const clinicalTiming = deriveClinicalTiming({
+      sourceText: params.gatewayText, decisionAt,
+      carePathway: emergencyGateway.carePathway,
+      reviewRequirement: emergencyGateway.reviewRequirement,
+    })
     const gatewayPersisted = await persistEmergencyGatewayResult(
       sessionId,
       params.tenantId,
       emergencyGateway,
       processingAttemptCount,
+      clinicalTiming,
     )
     if (!gatewayPersisted) {
       await markError(
@@ -132,9 +142,11 @@ export async function processTriageInBackground(
         await notifyTriageUrgent(
           sessionId,
           emergencyGateway.carePathway === 'emergency_now' ? 'emergent' : 'urgent',
-          emergencyGateway.carePathway === 'emergency_now'
-            ? 'EMERGENT — immediate action required'
-            : 'SAME-DAY CLINICIAN REVIEW',
+          dispositionPresentation({
+            tier: emergencyGateway.carePathway === 'emergency_now' ? 'emergent' : 'urgent',
+            carePathway: emergencyGateway.carePathway,
+            reviewRequirement: emergencyGateway.reviewRequirement,
+          }).display,
           'Deterministic neurology emergency screen requires immediate workflow action.',
           params.patient_id || null,
           params.tenantId,
@@ -151,6 +163,7 @@ export async function processTriageInBackground(
       patientAge: params.patient_age,
       patientSex: params.patient_sex,
       referringProviderType: params.referring_provider_type,
+      clinicalTiming,
     })
 
     const invokeSafetyExtractor = () =>
@@ -341,6 +354,7 @@ export async function processTriageInBackground(
       scoringModelProfile: TRIAGE_MODEL,
       scoringPromptVersion: TRIAGE_SCORING_PROMPT_VERSION,
       fusion,
+      clinicalTiming: withClinicalTimingAction(clinicalTiming, fusion.carePathway, fusion.reviewRequirement),
       adjudicatorResult,
       adjudicatorFailure,
       adjudicatorModelProfile: fusion.adjudicationRequired
@@ -372,9 +386,11 @@ export async function processTriageInBackground(
           await notifyTriageUrgent(
             sessionId,
             fusion.carePathway === 'emergency_now' ? 'emergent' : 'urgent',
-            fusion.carePathway === 'emergency_now'
-              ? 'EMERGENT — immediate action required'
-              : 'SAME-DAY CLINICIAN REVIEW',
+            dispositionPresentation({
+              tier: modelSafetyPersisted.carePathway === 'emergency_now' ? 'emergent' : 'urgent',
+              carePathway: modelSafetyPersisted.carePathway,
+              reviewRequirement: modelSafetyPersisted.reviewRequirement,
+            }).display,
             'Independent neurology safety review requires immediate workflow action; outpatient scoring did not complete.',
             params.patient_id || null,
             params.tenantId,
@@ -480,10 +496,12 @@ export async function processTriageInBackground(
     }
 
     const finalTier = completion.triageTier
-    const finalTierDisplay = formatTierDisplay(
-      finalTier,
-      aiResponse.red_flag_override,
-    )
+    const finalTierDisplay = dispositionPresentation({
+      tier: finalTier,
+      carePathway: completion.carePathway,
+      reviewRequirement: completion.reviewRequirement,
+      redFlagOverride: aiResponse.red_flag_override,
+    }).display
     // Urgent triage notification is non-fatal.
     try {
       const deterministicNotificationAlreadySent =

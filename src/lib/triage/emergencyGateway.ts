@@ -1,6 +1,6 @@
 import type { CarePathway, ReviewRequirement } from './types'
 
-export const EMERGENCY_GATEWAY_VERSION = 'neurology-emergency-gateway-v4'
+export const EMERGENCY_GATEWAY_VERSION = 'neurology-emergency-gateway-v5'
 
 export interface SourceLocation {
   packetId?: string
@@ -734,33 +734,32 @@ function sentenceSpans(
   return spans
 }
 
-function calendarYear(value: string | undefined): number | null {
+function calendarDate(value: string | undefined): number | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
   const [year, month, day] = value.split('-').map(Number)
   const parsed = new Date(Date.UTC(year, month - 1, day))
   return parsed.getUTCFullYear() === year &&
     parsed.getUTCMonth() === month - 1 &&
     parsed.getUTCDate() === day
-    ? year
+    ? parsed.getTime()
     : null
 }
 
-function hasPriorYearDocumentDate(
+function hasEarlierDocumentDate(
   text: string,
   span: TextSpan,
   source?: SourceLocation,
 ): boolean {
-  const decisionYear =
-    calendarYear(source?.decisionAsOf) ?? new Date().getUTCFullYear()
+  const decisionDate = calendarDate(source?.decisionAsOf ?? new Date().toISOString().slice(0, 10))!
   // Evaluation spans may combine a date header with its first finding, so the
   // label may be inside the span. It is an ambiguity annotation only, not a
   // document boundary or authority to lower the safety action.
   const precedingText = text.slice(0, span.endOffset)
-  let documentYear: number | null = null
+  let documentDate: number | null = null
   for (const match of precedingText.matchAll(LABELLED_DOCUMENT_DATE)) {
-    documentYear = calendarYear(match[1])
+    documentDate = calendarDate(match[1])
   }
-  return documentYear !== null && documentYear < decisionYear
+  return documentDate !== null && documentDate < decisionDate
 }
 
 function hasOnlyDirectlyNegatedRuleAnchors(
@@ -1223,7 +1222,7 @@ function collectLexicalHits(
       const temporality =
         experiencer === 'family' || HISTORICAL.test(span.text)
           ? 'historical'
-          : hasPriorYearDocumentDate(sourceText, span, source)
+          : hasEarlierDocumentDate(sourceText, span, source)
             ? 'unknown'
             : classifyTemporality(span.text)
       const suppressed =
@@ -1362,9 +1361,9 @@ function runEmergencyGatewayInternal(
       )
         ? scopedContext
         : evaluation.span.text
-      // Raw text cannot prove a document boundary. A prior-year date therefore
+      // Raw text cannot prove a document boundary. An earlier document date therefore
       // records ambiguous timing only; it never lowers a present emergency.
-      const datedSourceAmbiguity = hasPriorYearDocumentDate(
+      const datedSourceAmbiguity = hasEarlierDocumentDate(
         text,
         evaluation.span,
         source,
@@ -1502,7 +1501,7 @@ export function runEmergencyGateway(
         source.extractionConfidence < 0 ||
         source.extractionConfidence > 1)
     const invalidDecisionAsOf =
-      source.decisionAsOf !== undefined && calendarYear(source.decisionAsOf) === null
+      source.decisionAsOf !== undefined && calendarDate(source.decisionAsOf) === null
 
     if (
       invalidIdentifier(source.packetId) ||

@@ -29,6 +29,7 @@ function formatPct(n: number): string {
 type ResultsResponse = ValidationResults & {
   phase?: 'draft' | 'labeling' | 'unblinded' | 'archived'
   study_kind?: 'independent' | 'legacy_archive'
+  evidence_notice?: string
 }
 
 function ResultsPageContent() {
@@ -94,10 +95,10 @@ function ResultsPageContent() {
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
 
           <h1 style={{ color: '#f1f5f9', fontSize: '1.5rem', fontWeight: 700, margin: '0 0 8px' }}>
-            Inter-Rater Reliability Results
+            Assessment Label Review
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px' }}>
-            Results are available only after the study is formally unblinded.
+            Results are available only after the study is formally unblinded. Clinical validation is not established by this dashboard.
           </p>
 
           {error && (
@@ -142,8 +143,16 @@ function ResultsPageContent() {
           ) : results && (
             <>
               <section role="note" style={{ color: '#fde68a', border: '1px solid #a16207', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-                This dashboard contains exploratory legacy statistics and case snapshots. New evaluation receipts are retrieved separately by exact configuration revision. Do not use these agreement scores as a release gate: insufficient-data handling and statistical denominators still require review.
+                {results.evidence_notice || 'This dashboard contains descriptive statistics only. Do not use agreement scores as a clinical-validation or release gate.'}
               </section>
+              {results.clinical_assessment_analysis && <section aria-label="Clinical assessment analysis" style={{ background: 'rgba(30, 41, 59, 0.8)', border: '1px solid #7c3aed', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                <h2 style={{ color: '#e2e8f0', fontSize: '1rem', margin: '0 0 8px' }}>Clinical assessment v1</h2>
+                <p style={{ color: '#cbd5e1', fontSize: '0.8rem', margin: '0 0 14px' }}>This is the canonical reviewer-owned label for new assessments. It reports immutable {results.clinical_assessment_analysis.reviewer_kind.replace('_', ' ')} labels only. AI action, timing, and service comparison is not evaluated.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+                  <div><strong style={{ color: '#e2e8f0' }}>{results.clinical_assessment_analysis.coverage.assessments_recorded}/{results.clinical_assessment_analysis.coverage.submitted_reviews}</strong><span style={{ color: '#94a3b8', display: 'block', fontSize: '0.72rem' }}>assessments recorded</span></div>
+                  {([['Action', results.clinical_assessment_analysis.action_agreement], ['Timing', results.clinical_assessment_analysis.timing_agreement], ['Service destination', results.clinical_assessment_analysis.service_destination_agreement]] as const).map(([label, metric]) => <div key={label}><strong style={{ color: '#e2e8f0' }}>{metric.agreement_rate === null ? 'Not yet pairable' : formatPct(metric.agreement_rate)}</strong><span style={{ color: '#94a3b8', display: 'block', fontSize: '0.72rem' }}>{label} agreement · {metric.cases_compared} cases</span><span style={{ color: '#fbbf24', display: 'block', fontSize: '0.68rem' }}>{metric.disagreement_count} disagreements</span></div>)}
+                </div>
+              </section>}
               {/* Summary Cards */}
               {results.insufficient_reviewers ? (
                 <div style={{
@@ -765,7 +774,7 @@ function ResultsPageContent() {
                 marginBottom: '24px',
               }}>
                 <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 14px' }}>
-                  Agreement by Triage Tier
+                  Legacy comparison-tier agreement (descriptive)
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {TIER_ORDER.map(tier => {

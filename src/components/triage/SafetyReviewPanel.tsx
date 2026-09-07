@@ -19,18 +19,9 @@ export default function SafetyReviewPanel({ result }: { result: TriageResult }) 
   // requiresHumanReviewHold (data conflict / insufficient data / safety
   // conflict / emergency markers) is the flag that already draws that line
   // elsewhere in the UI — reused here, not recomputed differently.
-  // Same-day clinician review is a GENUINE hold but is NOT part of
-  // requiresHumanReviewHold (triageOutputPolicy.ts:67-71 covers emergency
-  // markers, safety conflict, data conflict and insufficient data only).
-  // Without this, an urgent same-day case would render the same calm
-  // "clinician confirmation pending" badge as a routine one — under-alarming a
-  // real hold, which is worse than the over-alarming this change set out to
-  // fix. Caught in review 2026-08-06.
+  // Immediate review, including the same-day workflow, uses that same hold.
   const policy = triageOutputPolicy(result)
-  const genuineHold =
-    held &&
-    (policy.requiresHumanReviewHold ||
-      result.care_pathway === 'same_day_clinician_review')
+  const genuineHold = held && policy.requiresHumanReviewHold
   const badgeLabel = genuineHold
     ? 'HUMAN REVIEW HOLD'
     : held

@@ -1,0 +1,202 @@
+[
+  {
+    "case_number": 1,
+    "title": "Case 1",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nReferral for episodes of difficulty speaking. The referring office copied a prior description of aphasia, but the date of that episode and whether symptoms are present now are not documented. The current clinician has not spoken with the patient or witness. No current examination or completed acute assessment is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 2,
+    "title": "Case 2",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nOptometry referral for newly observed bilateral optic-disc swelling described as papilledema. The patient reports recent headaches and brief visual dimming. The packet does not include visual fields, current visual acuity, brain imaging, venous imaging, or a prior specialist assessment of this finding.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 3,
+    "title": "Case 3",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nReferral for double vision and a drooping eyelid. The note does not establish the onset date, whether these findings are present now, pupil size or reactivity, pain, or other neurological findings. It contains no established ocular diagnosis or completed assessment of this presentation.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 4,
+    "title": "Case 4",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nSymmetric leg and arm weakness has progressed over three days. The patient can still walk into the office but now needs the handrail on stairs and cannot lift usual household items. No bulbar examination, respiratory measurements, or current assessment of swallowing and breathing is documented.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 5,
+    "title": "Case 5",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nSevere low-back pain radiates into both legs. Since this morning there is new urinary retention and numbness around the saddle area. The patient remains ambulatory. No examination or imaging evaluating the new bladder and sensory symptoms is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 6,
+    "title": "Case 6",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nA sudden severe headache reached maximum intensity in less than one minute three days ago. An outside report states that a head CT was negative, but its timing relative to onset and the rest of the assessment are absent. The headache persists. The patient is awake and can walk. No documented conclusion about the cause is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 7,
+    "title": "Case 7",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nA witness describes abrupt slurred speech and right-arm weakness lasting 20 minutes last night. Symptoms resolved and the patient reports being back to baseline this morning. No emergency or specialist assessment has occurred. Current neurological examination findings are not included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 8,
+    "title": "Case 8",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nSymptom onset: 2026-08-24T12:00:00Z\nEstablished multiple sclerosis. New leg weakness and altered sensation began at the recorded onset and remain present, reducing walking distance and the ability to complete usual work. No assessment of this new episode has occurred. The referral does not establish infection status or other possible causes. No current bulbar or respiratory complaint is described.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 9,
+    "title": "Case 9",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nA specialist previously confirmed functional seizures after assessment of the usual events. The patient continues to have those same events, with no new event type or change in pattern over six months. Events interfere with work and social activities. No co-occurring epilepsy is documented. Follow-up care has been interrupted after an insurance change.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 10,
+    "title": "Case 10",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nA specialist previously confirmed functional seizures after assessment of the usual events. In the past week, a witness reports a distinctly different spell with loss of awareness and bilateral jerking, followed by confusion. The patient is now back to baseline. This new event type has not been assessed. No co-occurring epilepsy is documented.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 11,
+    "title": "Case 11",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nAge 39. First witnessed episode of loss of awareness with bilateral rhythmic jerking occurred two days ago. The emergency assessment documented full recovery, no focal deficit, no ongoing metabolic trigger, and no acute lesion on the reported imaging. There have been no recurrent events. The referral requests a first specialist assessment; no epilepsy diagnosis has been established.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 12,
+    "title": "Case 12",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nAge 41. First witnessed episode of loss of awareness with bilateral rhythmic jerking occurred two days ago. The emergency assessment documented full recovery, no focal deficit, no ongoing metabolic trigger, and no acute lesion on the reported imaging. There have been no recurrent events. The referral requests a first specialist assessment; no epilepsy diagnosis has been established.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 13,
+    "title": "Case 13",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-01-02\nSudden aphasia and right-arm weakness are described in this copied outside note. The packet provides no subsequent assessment, resolution, or current symptom status. The date the focal symptoms actually occurred is not separately documented.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 14,
+    "title": "Case 14",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nThe opening summary says chronic stable back pain without new neurological symptoms. A later signed clinical entry in the same packet documents new urinary retention and saddle numbness this morning. There is no subsequent reconciliation or assessment of these findings.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 15,
+    "title": "Case 15",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nThe referral was obtained through an interpreter. A witness describes a sudden severe headache that was maximal immediately. The timing is described as recent, but an exact onset time and any completed assessment are not recorded. No current examination is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 16,
+    "title": "Case 16",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nContinuous dizziness began abruptly today with marked new gait unsteadiness. The patient cannot walk the usual distance without assistance. No documented eye-movement examination, HINTS examination, or clinical assessment establishing a benign peripheral cause is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 17,
+    "title": "Case 17",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nLongstanding episodic migraine with an unchanged typical pattern. The current examination is documented as normal. There is no thunderclap onset, positional change, progressive pattern, new focal symptom, systemic illness, or other new warning feature. Current treatment provides adequate symptom control. The referral asks about long-term management options.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 18,
+    "title": "Case 18",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nRadicular neck-to-arm pain has been unchanged for eight weeks. Pain is controlled, daily activities are intact, and the documented examination shows no weakness, gait abnormality, upper motor neuron finding, or bladder symptom. There is no new neurological change.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 19,
+    "title": "Case 19",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nRadicular neck-to-arm pain had been unchanged for eight weeks. During the past two days the patient has developed a new gait disturbance and difficulty using both hands. Current gait and upper motor neuron examination findings are not documented. No assessment of this change is included.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 20,
+    "title": "Case 20",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nAge 72. New temporal headache with jaw fatigue while chewing and an episode of transient monocular visual loss today. Current visual acuity and eye examination are not documented. No clinician assessment or treatment of this new presentation has occurred. The referral was sent to a general headache clinic.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 21,
+    "title": "Case 21",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nEstablished epilepsy with a recent increase in event frequency. The current examination documents return to baseline, with no ongoing or prolonged event. The treating clinician has requested epilepsy-specialist assessment within one week. The receiving office reports that its next epilepsy appointment is three months away; no alternate service has yet been arranged.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 22,
+    "title": "Case 22",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nNew aphasia and right-sided weakness began 30 minutes ago and are still present. No acute assessment has occurred. The referring clinician has not yet received any triage-system output.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 23,
+    "title": "Case 23",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nMigraine occurs on eight days per month and has been unchanged for one year. There are no new warning features and the current examination is normal. Work and usual daily activities remain intact. Two preventive therapies were stopped: topiramate for lack of benefit and propranolol for dizziness. Current headache frequency and function have not changed since those trials.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 24,
+    "title": "Case 24",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nMigraine occurs on eight days per month and has been unchanged for one year. There are no new warning features and the current examination is normal. Work and usual daily activities remain intact. Three preventive therapies were stopped: topiramate for lack of benefit, propranolol for dizziness, and amitriptyline for sedation. Current headache frequency and function have not changed since those trials.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  },
+  {
+    "case_number": 25,
+    "title": "Case 25",
+    "referral_text": "SYNTHETIC CASE \u2014 NO REAL PATIENT.\nDocument date: 2026-09-05\nMigraine occurs on eight days per month and has been unchanged for one year. There are no new warning features and the current examination is normal. The patient misses three workdays per month and needs help with usual tasks during attacks; this level of disability has also been unchanged for one year. Two preventive therapies were stopped: topiramate for lack of benefit and propranolol for dizziness. Current headache frequency and function have not changed since those trials.",
+    "patient_age": null,
+    "patient_sex": null,
+    "is_calibration": false
+  }
+]

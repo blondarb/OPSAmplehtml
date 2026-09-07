@@ -52,6 +52,19 @@ const EXECUTION_MODES = [
   'live_ensemble',
 ] as const satisfies readonly SentinelExecutionMode[]
 
+const ISO_UTC_INSTANT = /^((?:19|20)\d{2}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/
+
+function parseDecisionAt(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || !ISO_UTC_INSTANT.test(value)) {
+    fail(path, 'must be an ISO-8601 UTC instant ending in Z')
+  }
+  if (!Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value.slice(0, 10)) {
+    fail(path, 'must be a valid ISO-8601 UTC instant')
+  }
+  return value
+}
+
 const GATE_METRICS = [
   'emergency_under_triage_count',
   'invalid_time_critical_evidence_count',
@@ -319,6 +332,7 @@ function parseCase(value: unknown, path: string): SentinelCase {
   if (!Array.isArray(value.executionModes) || value.executionModes.length === 0) {
     fail(`${path}.executionModes`, 'must contain at least one mode')
   }
+  const decisionAt = parseDecisionAt(value.decisionAt, `${path}.decisionAt`)
   return {
     id: boundedString(value.id, `${path}.id`, 100),
     title: boundedString(value.title, `${path}.title`, 240),
@@ -335,6 +349,7 @@ function parseCase(value: unknown, path: string): SentinelCase {
         ),
       ),
     ],
+    ...(decisionAt !== undefined ? { decisionAt } : {}),
     input: parseInput(value.input, `${path}.input`),
     expected: parseExpectation(value.expected, `${path}.expected`),
   }

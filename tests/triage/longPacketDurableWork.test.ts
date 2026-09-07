@@ -125,7 +125,7 @@ const packetEmergencyResult = {
       schedulingLocked: true,
       signals: [],
       lexicalHits: [],
-      version: 'neurology-emergency-gateway-v4',
+      version: 'neurology-emergency-gateway-v5',
     },
   })),
   plannerVersion: plan.version,
