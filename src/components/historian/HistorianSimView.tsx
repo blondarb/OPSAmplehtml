@@ -174,6 +174,11 @@ export default function HistorianSimView() {
         { persona: livePersona, transcript: convo, differential: diff.differential },
         'Summary',
       )
+      const thor = await postJson(
+        '/api/ai/historian/sim/score/thoroughness',
+        { persona: livePersona, transcript: convo },
+        'Thoroughness',
+      )
       await postJson(
         '/api/ai/historian/sim/score/finalize',
         {
@@ -181,6 +186,7 @@ export default function HistorianSimView() {
           transcript: convo,
           differential: diff.differential,
           physician_summary: sum.physician_summary,
+          thoroughness: thor.thoroughness,
           batchId,
           batchLabel,
         },
