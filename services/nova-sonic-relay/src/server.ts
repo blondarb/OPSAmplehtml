@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import http, { type IncomingMessage } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { NovaSonicSession } from './novaSonicSession.js'
+import { NovaConnectionManager } from './novaConnectionManager.js'
 import { TranscribeMedicalSession } from './transcribeMedicalSession.js'
 import type { ClientMsg, ServerMsg } from './wsProtocol.js'
 
@@ -216,7 +216,7 @@ export function handleConnection(ws: WebSocket): void {
     }
   }
 
-  const session = new NovaSonicSession({
+  const session = new NovaConnectionManager({
     onTextOutput(role, content) {
       TRACE(`-> text[${role}] ${JSON.stringify(content.slice(0, 60))}`)
       if (role.toUpperCase() === 'USER') {
@@ -271,22 +271,26 @@ export function handleConnection(ws: WebSocket): void {
       console.error('[nova-session] stream error:', message, err)
       send(ws, { t: 'error', message })
 
-      // Every onError call is stream-terminating, not an advisory notice:
-      // NovaSonicSession invokes this callback from exactly three places
-      // (novaSonicSession.ts) — the client.send() catch in start() (stream
-      // never opened; session is reset to closed/inactive before the
-      // callback fires), the modelStreamErrorException/internalServerException
+      // Every onError call this handler actually sees is stream-terminating,
+      // not an advisory notice. NovaSonicSession invokes its own onError from
+      // exactly three places (novaSonicSession.ts) — the client.send() catch
+      // in start(), the modelStreamErrorException/internalServerException
       // branches inside runResponseLoop's for-await, and that same loop's
-      // catch block — and the latter two are always immediately followed by
-      // `this.active = false` in the loop's `finally`. So by the time onError
-      // runs, the underlying Bedrock bidi stream is already over in every
-      // case; there is no "recoverable" error variant to special-case on
-      // message/name. Leaving the client ws open here was the bug: it kept
-      // accepting `audio` messages into a dead Nova stream, so a patient saw
-      // a silently frozen interviewer for ~100s instead of a closed session.
-      // Best-effort teardown, then close so the browser's onclose fires
-      // `disconnected` and the hook runs the graceful-end (flush + save)
-      // flow, matching the existing 'stop' case below.
+      // catch block — and by the time any of those fire, the underlying
+      // Bedrock bidi stream is already over. NovaConnectionManager
+      // (novaConnectionManager.ts) sits between that and this callback: on a
+      // stream error it first attempts ONE connection-renewal (opens a fresh
+      // session seeded with the accumulated history, so the interview
+      // continues past Nova's ~8-minute per-connection cap without the
+      // browser noticing) and only calls this onError if that renewal itself
+      // fails — so by the time we get here, there is no recoverable path
+      // left, exactly as before. Leaving the client ws open here was the
+      // original #234 bug: it kept accepting `audio` messages into a dead
+      // Nova stream, so a patient saw a silently frozen interviewer for
+      // ~100s instead of a closed session. Best-effort teardown, then close
+      // so the browser's onclose fires `disconnected` and the hook runs the
+      // graceful-end (flush + save) flow, matching the existing 'stop' case
+      // below.
       if (closing) return // 'stop' (or a prior onError) already started teardown
       closing = true
       transcribe?.stop().catch(() => {})

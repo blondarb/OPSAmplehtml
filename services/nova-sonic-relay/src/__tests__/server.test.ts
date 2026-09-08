@@ -141,9 +141,15 @@ describe('handleConnection — onError closes the client ws (nova stream error g
     expect(ws.closeCalls[0]).toEqual({ code: 1011, reason: 'nova stream error' })
   })
 
-  it('a mid-stream modelStreamErrorException also sends {t:"error"} and closes with code 1011', async () => {
+  it('a mid-stream modelStreamErrorException, when the connection-renewal attempt it triggers ALSO fails, still sends {t:"error"} and closes with code 1011', async () => {
+    // NovaConnectionManager (src/novaConnectionManager.ts) now attempts one
+    // connection-renewal before giving up on a stream error — see its
+    // "reactive path". This test proves the #234 close(1011) fallback still
+    // fires when that renewal attempt itself cannot open a new stream: the
+    // FIRST client.send() (the original session) succeeds; the SECOND
+    // (the renewal's replacement session) fails.
     const body = makeControllableBody()
-    sendMock.mockResolvedValue({ body })
+    sendMock.mockResolvedValueOnce({ body }).mockRejectedValueOnce(new Error('renewal open also failed'))
 
     const ws = new FakeWs()
     handleConnection(ws as never)
@@ -164,6 +170,29 @@ describe('handleConnection — onError closes the client ws (nova stream error g
     expect(ws.closeCalls[0]).toEqual({ code: 1011, reason: 'nova stream error' })
 
     body.end()
+  })
+
+  it('a mid-stream modelStreamErrorException, when the connection-renewal attempt it triggers SUCCEEDS, does NOT send {t:"error"} or close — the interview continues on the new connection', async () => {
+    const oldBody = makeControllableBody()
+    const newBody = makeControllableBody()
+    sendMock.mockResolvedValueOnce({ body: oldBody }).mockResolvedValueOnce({ body: newBody })
+
+    const ws = new FakeWs()
+    handleConnection(ws as never)
+
+    sendMsg(ws, { t: 'start', instructions: 'be a historian', tools: [] })
+    await flush()
+
+    oldBody.push({ modelStreamErrorException: { name: 'ModelStreamErrorException', message: 'Model has timed out in processing the request. Try your request again.' } })
+    await flush()
+
+    const messages = ws.sentMessages() as Array<{ t: string; message?: string }>
+    expect(messages.some((m) => m.t === 'error')).toBe(false)
+    expect(ws.closeCalls).toHaveLength(0)
+    expect(sendMock).toHaveBeenCalledTimes(2) // original + one renewal attempt, no more
+
+    oldBody.end()
+    newBody.end()
   })
 
   it('"stop" followed by an error does not double-close: only the stop path\'s close() runs', async () => {

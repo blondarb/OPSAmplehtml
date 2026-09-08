@@ -210,6 +210,102 @@ export function userText(
 }
 
 // ---------------------------------------------------------------------------
+// 3c. historyContent — non-interactive USER/ASSISTANT turn used to seed a
+// freshly opened connection with prior conversation (Nova Sonic connection
+// renewal — see novaConnectionManager.ts. Nova enforces an ~8-minute cap per
+// bidirectional stream; renewal opens a new stream and replays history here
+// so the model continues without the browser noticing).
+//
+// Shape verified 2026-09-08 against aws-samples/sample-serverless-nova-sonic-chat
+// (linked from the official aws-samples/amazon-nova-samples README as the
+// reference "Serverless Nova Sonic Chat" solution for the 8-minute limit),
+// specifically its `enqueueChatHistory` method in app/src/agent/nova-stream.ts
+// (fetched via WebFetch on the raw GitHub URL, not cloned/run). That method's
+// three events, reproduced there near-verbatim:
+//   contentStart: { promptName, contentName, type: 'TEXT', interactive: false,
+//                    textInputConfiguration: { mediaType: 'text/plain' } }
+//   textInput:    { promptName, contentName, content, role: role.toUpperCase() }
+//   contentEnd:   { promptName, contentName }
+// Two differences from systemContent()/userText() above are load-bearing and
+// intentional, not oversights:
+//   - `role` lives on `textInput`, not `contentStart` (systemContent/userText
+//     put it on contentStart).
+//   - `interactive` is `false` — this is historical context for the model to
+//     read, not a live turn it should treat as needing an immediate response.
+// The amazon-nova-samples "speech-to-speech" sample itself was not reachable
+// with a working conversation-history code sample during this task; this
+// builder follows the linked serverless-chat reference sample instead. See
+// the PR description for the exact fetch trail.
+// ---------------------------------------------------------------------------
+
+export type HistoryRole = 'USER' | 'ASSISTANT'
+
+interface HistoryContentStartEvent {
+  event: {
+    contentStart: {
+      promptName: string
+      contentName: string
+      type: 'TEXT'
+      interactive: false
+      textInputConfiguration: { mediaType: string }
+    }
+  }
+}
+
+interface HistoryTextInputEvent {
+  event: {
+    textInput: {
+      promptName: string
+      contentName: string
+      content: string
+      role: HistoryRole
+    }
+  }
+}
+
+type HistoryContentEvents = [HistoryContentStartEvent, HistoryTextInputEvent, ContentEndEvent]
+
+export function historyContent(
+  promptName: string,
+  role: HistoryRole,
+  text: string,
+  contentName?: string,
+): HistoryContentEvents {
+  const name = contentName ?? uuidv4()
+  return [
+    {
+      event: {
+        contentStart: {
+          promptName,
+          contentName: name,
+          type: 'TEXT',
+          interactive: false,
+          textInputConfiguration: { mediaType: 'text/plain' },
+        },
+      },
+    },
+    {
+      event: {
+        textInput: {
+          promptName,
+          contentName: name,
+          content: text,
+          role,
+        },
+      },
+    },
+    {
+      event: {
+        contentEnd: {
+          promptName,
+          contentName: name,
+        },
+      },
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
 // 4. Audio content events
 // ---------------------------------------------------------------------------
 
