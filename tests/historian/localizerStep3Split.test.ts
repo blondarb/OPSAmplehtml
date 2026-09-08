@@ -96,6 +96,22 @@ it('uses the byte-compatible legacy shape and persists detail when both resolve'
   expect(calls[2].temperature).toBe(0.3)
 })
 
+it('includes questionsAlreadyAsked (from the full transcript) in the generator input sent to Bedrock', async () => {
+  const fullTranscript = [
+    { role: 'assistant', text: 'Hi, thanks for coming in today.' },
+    { role: 'user', text: 'Sure.' },
+    { role: 'assistant', text: 'Where is the weakness most located?' },
+    { role: 'user', text: 'Mostly my left arm.' },
+  ]
+  const body = await (await POST(request({ fullTranscript }))).json()
+  expect(body).toEqual(expectedLegacy(0))
+  const calls = mocks.invoke.mock.calls.map(([opts]) => opts)
+  const steerInput = JSON.parse(calls[1].messages[0].content)
+  expect(steerInput.questionsAlreadyAsked).toEqual(['Where is the weakness most located?'])
+  const detailInputParsed = JSON.parse(calls[2].messages[0].content)
+  expect(detailInputParsed.questionsAlreadyAsked).toEqual(['Where is the weakness most located?'])
+})
+
 it('preserves the legacy response when steer rejects and detail resolves', async () => {
   const original = mocks.invoke.getMockImplementation()!
   mocks.invoke.mockImplementation(opts => opts.maxTokens === 300 ? Promise.reject(abortError()) : original(opts))
