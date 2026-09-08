@@ -41,6 +41,15 @@ export interface NovaSonicCallbacks {
   onAudioOutput?(base64: string): void
   onToolUse?(toolUse: NovaSonicToolUse): void
   onCompletionEnd?(): void
+  /**
+   * Fires at the end of each spoken turn — `contentEnd` with `type: "AUDIO"`
+   * and `stopReason: "END_TURN"` (PARTIAL_TURN does not fire it). Per AWS's
+   * output-events docs this is the actual per-turn quiet-point marker;
+   * `completionEnd` (see onCompletionEnd) is not reliably emitted per turn in
+   * practice, so NovaConnectionManager uses this as its primary renewal
+   * quiet-point signal.
+   */
+  onTurnEnd?(): void
   onError?(err: unknown): void
   onBargeIn?(): void
 }
@@ -436,6 +445,9 @@ export class NovaSonicSession {
     if (event.contentEnd) {
       if (event.contentEnd.contentId) {
         this.textStageByContentId.delete(event.contentEnd.contentId)
+      }
+      if (event.contentEnd.type === 'AUDIO' && event.contentEnd.stopReason === 'END_TURN') {
+        this.callbacks.onTurnEnd?.()
       }
       return
     }

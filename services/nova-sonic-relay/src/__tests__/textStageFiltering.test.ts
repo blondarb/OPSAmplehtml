@@ -139,6 +139,28 @@ describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => 
     expect(forwarded).toEqual([])
   })
 
+  it('calls onTurnEnd on contentEnd type AUDIO with stopReason END_TURN, and not on PARTIAL_TURN', () => {
+    let turnEnds = 0
+    const session = new NovaSonicSession({
+      onTurnEnd: () => { turnEnds++ },
+    })
+    const dispatch = (e: unknown) =>
+      (session as unknown as { handleModelEvent(j: unknown): void }).handleModelEvent(e)
+
+    // A mid-turn AUDIO contentEnd (PARTIAL_TURN) must NOT fire onTurnEnd.
+    dispatch({ event: { contentEnd: { contentId: 'a-1', type: 'AUDIO', stopReason: 'PARTIAL_TURN' } } })
+    expect(turnEnds).toBe(0)
+
+    // The end-of-turn AUDIO contentEnd (END_TURN) fires onTurnEnd exactly once.
+    dispatch({ event: { contentEnd: { contentId: 'a-2', type: 'AUDIO', stopReason: 'END_TURN' } } })
+    expect(turnEnds).toBe(1)
+
+    // A TEXT contentEnd, even with stopReason END_TURN, must not fire onTurnEnd
+    // (only AUDIO contentEnd marks the spoken-turn boundary).
+    dispatch({ event: { contentEnd: { contentId: 'c-1', type: 'TEXT', stopReason: 'END_TURN' } } })
+    expect(turnEnds).toBe(1)
+  })
+
   it('cleans up stage tracking on contentEnd (no unbounded growth)', () => {
     const { dispatch } = makeHarness()
     const session = new NovaSonicSession({})

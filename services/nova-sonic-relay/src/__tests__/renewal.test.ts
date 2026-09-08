@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NovaConnectionManager } from '../novaConnectionManager.js'
-import type { NovaSonicCallbacks, NovaSonicStartOptions } from '../novaSonicSession.js'
+import { NovaConnectionManager, sanitizeHistoryForNova } from '../novaConnectionManager.js'
+import type { NovaSonicCallbacks, NovaSonicStartOptions, HistoryTurn } from '../novaSonicSession.js'
 import type { Tool } from '../eventBuilders.js'
 
 // ---------------------------------------------------------------------------
@@ -260,5 +260,134 @@ describe('NovaConnectionManager', () => {
     await stopPromise
 
     expect(pendingSession.stopCalls).toBe(1)
+  })
+
+  // ---------------------------------------------------------------------
+  // Production failure repro (2026-09-08, CloudWatch /ecs/nova-sonic-relay):
+  // renewal fired at the 7:45 hard deadline, switched to a new session
+  // seeded with history whose first turn was Henry's ASSISTANT greeting,
+  // and Nova immediately failed the new stream with "First message in
+  // chat history should not be Assistant."
+  // ---------------------------------------------------------------------
+
+  it('history seeded into the renewal session starts with USER and has no two consecutive same-role turns, given a real-shaped accumulated history (greeting, Q/A pairs, a stacked ASSISTANT/ASSISTANT pair, a stacked USER/USER/USER run)', async () => {
+    const { factory, sessions } = makeFactory()
+    const manager = new NovaConnectionManager(
+      {},
+      { sessionFactory: factory, renewAfterMs: 20, hardRenewMs: 10_000_000 },
+    )
+
+    await manager.start('be a historian', [], 'matthew')
+    const oldSession = sessions[0]
+
+    // Greeting — the ASSISTANT turn that must never lead the seeded history.
+    oldSession.callbacks.onTextOutput?.('ASSISTANT', 'Hello, thanks for calling. What brings you in today?')
+    // Q/A pair.
+    oldSession.callbacks.onTextOutput?.('USER', 'My patient has sudden right-sided weakness.')
+    // Stacked ASSISTANT/ASSISTANT pair (two assistant turns with no user turn between).
+    oldSession.callbacks.onTextOutput?.('ASSISTANT', 'How long ago did it start?')
+    oldSession.callbacks.onTextOutput?.('ASSISTANT', 'Also, any facial droop?')
+    // Stacked USER/USER/USER run.
+    oldSession.callbacks.onTextOutput?.('USER', 'About 30 minutes ago.')
+    oldSession.callbacks.onTextOutput?.('USER', 'Yes, on the right side.')
+    oldSession.callbacks.onTextOutput?.('USER', 'Speech is slurred too.')
+
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    await flush()
+
+    expect(sessions).toHaveLength(2)
+    const seeded = sessions[1].startCalls[0].options?.history ?? []
+
+    expect(seeded.length).toBeGreaterThan(0)
+    expect(seeded[0].role).toBe('USER')
+    for (let i = 1; i < seeded.length; i++) {
+      expect(seeded[i].role).not.toBe(seeded[i - 1].role)
+    }
+    expect(seeded).toEqual([
+      { role: 'USER', text: 'My patient has sudden right-sided weakness.' },
+      { role: 'ASSISTANT', text: 'How long ago did it start? Also, any facial droop?' },
+      { role: 'USER', text: 'About 30 minutes ago. Yes, on the right side. Speech is slurred too.' },
+    ])
+  })
+
+  it('after the renewAfterMs timer fires while speaking, an onTurnEnd callback (not onCompletionEnd) triggers a quiet-point renewal', async () => {
+    const { factory, sessions } = makeFactory()
+    const manager = new NovaConnectionManager(
+      {},
+      { sessionFactory: factory, renewAfterMs: 20, hardRenewMs: 10_000_000 },
+    )
+
+    await manager.start('be a historian', [], 'matthew')
+    const oldSession = sessions[0]
+
+    // Model is mid-speech (audio arrived, no completionEnd/turnEnd yet).
+    oldSession.callbacks.onAudioOutput?.('audio-chunk')
+
+    // Let the renewAfterMs timer fire — it should mark renewalDue but NOT
+    // renew yet, because the connection isn't at a quiet point.
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    await flush()
+    expect(sessions).toHaveLength(1)
+
+    // Per-turn quiet point arrives via onTurnEnd, without any onCompletionEnd.
+    oldSession.callbacks.onTurnEnd?.()
+    await flush()
+
+    expect(sessions).toHaveLength(2)
+    const newSession = sessions[1]
+    expect(newSession.startCalls).toHaveLength(1)
+    expect(newSession.startCalls[0].options?.skipGreeting).toBe(true)
+  })
+})
+
+describe('sanitizeHistoryForNova', () => {
+  it('drops leading turns until the first USER turn', () => {
+    const input: HistoryTurn[] = [
+      { role: 'ASSISTANT', text: 'greeting' },
+      { role: 'USER', text: 'hi' },
+      { role: 'ASSISTANT', text: 'hello back' },
+    ]
+    expect(sanitizeHistoryForNova(input)).toEqual([
+      { role: 'USER', text: 'hi' },
+      { role: 'ASSISTANT', text: 'hello back' },
+    ])
+  })
+
+  it('merges consecutive same-role turns, joining text with a single space', () => {
+    const input: HistoryTurn[] = [
+      { role: 'USER', text: 'part one' },
+      { role: 'USER', text: 'part two' },
+      { role: 'ASSISTANT', text: 'reply one' },
+      { role: 'ASSISTANT', text: 'reply two' },
+      { role: 'ASSISTANT', text: 'reply three' },
+    ]
+    expect(sanitizeHistoryForNova(input)).toEqual([
+      { role: 'USER', text: 'part one part two' },
+      { role: 'ASSISTANT', text: 'reply one reply two reply three' },
+    ])
+  })
+
+  it('returns [] for empty input', () => {
+    expect(sanitizeHistoryForNova([])).toEqual([])
+  })
+
+  it('returns [] for all-assistant input (no USER turn to anchor on)', () => {
+    const input: HistoryTurn[] = [
+      { role: 'ASSISTANT', text: 'one' },
+      { role: 'ASSISTANT', text: 'two' },
+    ]
+    expect(sanitizeHistoryForNova(input)).toEqual([])
+  })
+
+  it('drops empty-text turns', () => {
+    const input: HistoryTurn[] = [
+      { role: 'USER', text: 'hi' },
+      { role: 'ASSISTANT', text: '' },
+      { role: 'ASSISTANT', text: 'hello' },
+    ]
+    expect(sanitizeHistoryForNova(input)).toEqual([
+      { role: 'USER', text: 'hi' },
+      { role: 'ASSISTANT', text: 'hello' },
+    ])
   })
 })
