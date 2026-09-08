@@ -25,6 +25,8 @@ Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults 
 | `NOVA_RELAY_SHARED_SECRET` | *(none)* | **Required to accept any connection.** HMAC secret shared with the Next.js app's `NOVA_RELAY_SHARED_SECRET`; used to validate the short-lived auth token the browser sends as a WS subprotocol. Unset = every WebSocket upgrade is rejected (fail closed) — there is no "auth disabled" mode. |
 | `NOVA_RELAY_ALLOWED_ORIGINS` | *(none — origin check skipped)* | Comma-separated allowlist of exact `Origin` header values (e.g. `https://app.neuroplans.app`). When set, connections from any other origin are rejected alongside the token check. When unset, the token is the sole gate. |
 | `TRANSCRIBE_MEDICAL_ENABLED` | `false` | **Flag-gated, off by default.** When `true`/`1`, the relay opens a second, parallel AWS Transcribe Medical streaming session per call on the same caller audio Nova Sonic receives, and emits `medicalTranscript` messages (`{ t: 'medicalTranscript', text, isPartial }`) alongside Nova's own transcripts — a higher-accuracy cross-check on spoken identifiers (MRN/name/DOB) that Nova Sonic (speech-to-speech) is prone to dropping digits from. Fail-safe: any Transcribe Medical error is logged and the session goes inert; the Nova Sonic call is never affected. Requires the task role to have `transcribe:StartMedicalStreamTranscription`. See `src/transcribeMedicalSession.ts`. |
+| `NOVA_RENEW_AFTER_MS` | `420000` (7:00) | See [8-minute connection renewal](#8-minute-connection-renewal) below. |
+| `NOVA_RENEW_HARD_MS` | `465000` (7:45) | See [8-minute connection renewal](#8-minute-connection-renewal) below. |
 
 ### WebSocket authentication
 
@@ -35,6 +37,21 @@ Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults 
 3. `handleProtocols` only runs after `verifyClient` accepts, and simply echoes back `nova.v1` as the negotiated subprotocol.
 
 Token format: `${base64url(JSON.stringify({exp}))}.${base64url(HMAC_SHA256(secret, payload))}` — see the header comment in `src/server.ts` and the minting logic in `src/app/api/ai/historian/session/route.ts` (Next.js app) for the exact byte-for-byte contract both sides must agree on.
+
+---
+
+## 8-minute connection renewal
+
+Amazon Nova 2 Sonic enforces a hard **~8-minute limit per bidirectional stream** ("Connection limit of 8 minutes, with connection renewal and session continuation pattern available in code samples" — [docs.aws.amazon.com/nova/latest/nova2-userguide/using-conversational-speech.html](https://docs.aws.amazon.com/nova/latest/nova2-userguide/using-conversational-speech.html)). The historian interview is designed to run 15-20 minutes, so **every real interview hits this cap.**
+
+`src/novaConnectionManager.ts` (`NovaConnectionManager`) wraps `NovaSonicSession` and renews the underlying Bedrock connection before that happens, so the client WebSocket — and the browser — never sees it:
+
+- **Trigger:** at `NOVA_RENEW_AFTER_MS` (default 7:00), but only at a *quiet point* (right after the model finishes a turn — `completionEnd` — never mid-speech and never with a tool call outstanding). If the connection is already quiet when the timer fires, renewal starts immediately; otherwise it waits for the next `completionEnd`.
+- **Hard deadline:** if no quiet point has arrived by `NOVA_RENEW_HARD_MS` (default 7:45), renewal is forced at the next transcript boundary regardless of speaking/tool state, so it can never ride all the way into Nova's own cutoff.
+- **What happens:** a second `NovaSonicSession` opens with the same instructions/tools/voice, seeded with the accumulated conversation (every USER/ASSISTANT turn the old session forwarded, capped at ~60k characters, oldest dropped first) plus a one-line system note telling the model to continue, not re-greet. Once that new stream is open, the manager atomically switches audio/tool-result/system-text routing and callbacks to it, then stops the old session in the background. The client WebSocket is never touched.
+- **Reactive fallback:** if the *old* connection errors (e.g. Nova's own timeout fires) before a scheduled renewal completed, the manager attempts one renewal immediately. Only if that attempt also fails does it fall back to the existing graceful-close behavior (PR #234: relay closes the client ws with code `1011`, the browser ends the interview with the transcript already saved).
+- **Rate limit:** at most one renewal attempt per 60 seconds.
+- **What the browser sees:** nothing — no reconnect, no gap in audio/transcript, no re-greeting. Operationally, `[nova-renew] ...` lines in the relay log (`scheduled` / `started` / `switched` / `failed` — never transcript text) are the only visible trace.
 
 ---
 

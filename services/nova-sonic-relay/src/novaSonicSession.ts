@@ -15,6 +15,7 @@ import {
   promptStart,
   systemContent,
   userText,
+  historyContent,
   audioContentStart,
   audioInput,
   audioContentEnd,
@@ -22,6 +23,7 @@ import {
   promptEnd,
   sessionEnd,
   type Tool,
+  type HistoryRole,
 } from './eventBuilders.js'
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,20 @@ export interface NovaSonicCallbacks {
 // eventBuilders. We keep it loosely typed — the SDK only cares that the JSON
 // serialization is valid Nova Sonic protocol.
 type RawEvent = { event: Record<string, unknown> }
+
+/** One prior conversation turn, replayed into a freshly opened connection. */
+export interface HistoryTurn {
+  role: HistoryRole
+  text: string
+}
+
+/** Options accepted by start() beyond the normal instructions/tools/voiceId — used only by NovaConnectionManager's connection-renewal path (novaConnectionManager.ts). */
+export interface NovaSonicStartOptions {
+  /** Prior conversation turns to seed as non-interactive history content, in order. */
+  history?: HistoryTurn[]
+  /** Skip the auto "greet the patient" kickoff — used when this connection is a renewal, not a fresh interview start. */
+  skipGreeting?: boolean
+}
 
 // The interrupted/barge-in signal Nova Sonic embeds in a textOutput content
 // string. Spaces are intentional and match the model's serialization, but we
@@ -210,18 +226,30 @@ export class NovaSonicSession {
 
   /**
    * Open the stream: assemble the init events (sessionStart → promptStart →
-   * system content → open the user audio channel), send the command, then kick
-   * off the response loop without awaiting it.
+   * system content → [history, if this is a renewal] → open the user audio
+   * channel), send the command, then kick off the response loop without
+   * awaiting it.
    */
-  async start(instructions: string, tools: Tool[], voiceId?: string): Promise<void> {
+  async start(
+    instructions: string,
+    tools: Tool[],
+    voiceId?: string,
+    options?: NovaSonicStartOptions,
+  ): Promise<void> {
     if (this.active || this.closed) {
       return
+    }
+
+    const historyEvents: RawEvent[] = []
+    for (const turn of options?.history ?? []) {
+      historyEvents.push(...historyContent(this.promptName, turn.role, turn.text))
     }
 
     this.initEvents = [
       sessionStart(),
       promptStart(this.promptName, tools, voiceId),
       ...systemContent(this.promptName, instructions),
+      ...historyEvents,
       audioContentStart(this.promptName, this.audioContentName),
     ]
 
@@ -250,7 +278,9 @@ export class NovaSonicSession {
     this.responseLoop = this.runResponseLoop(response)
     this.responseLoop.catch(() => {})
 
-    this.sendGreetingKickoff()
+    if (!options?.skipGreeting) {
+      this.sendGreetingKickoff()
+    }
   }
 
   /**
