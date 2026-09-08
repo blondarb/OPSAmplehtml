@@ -3,6 +3,7 @@ import ts from 'typescript'
 import { describe, expect, it, vi } from 'vitest'
 import { shouldPushLocalizer } from '@/lib/historian/precloseGate'
 import { buildNovaHint } from '@/lib/historian/novaSteer'
+import { resolveLocalizerSessionId } from '@/lib/historian/localizerSessionKey'
 
 const hook = readFileSync('src/hooks/useRealtimeSession.ts', 'utf8')
 const pushSource = hook.slice(hook.indexOf('  const pushLocalizerContext ='), hook.indexOf('  // ── Localizer: fire async'))
@@ -24,9 +25,10 @@ function harness(openai = false, options: { localizerDetail?: boolean; onLocaliz
     localizerAbortRef: { current: null }, detailInFlightRef: { current: null },
     localizerDataRef: { current: null }, finalizingRef: { current: false }, sessionGenRef: { current: 1 },
     transcriptRef: { current: [{ role: 'user', text: 'old'.repeat(30000) }, { role: 'assistant', text: 'newest' }] },
+    serverSessionIdRef: { current: null as string | null },
   }
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ push_payload: { attending_gaps: ['First?', 'Second?'] } }) })
-  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, ATTENDING_HINT_TOOL_NAME: 'get_attending_hint', setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
+  const env = { ...refs, fetch, options, shouldPushLocalizer, buildNovaHint, resolveLocalizerSessionId, ATTENDING_HINT_TOOL_NAME: 'get_attending_hint', setLocalizerLoading: vi.fn(), setLocalizerData: vi.fn(), useCallback: (fn: unknown) => fn }
   const source = `${boundSource}\n${pushSource}\n${runSource}\nfunction serveTool(toolName, toolUseId) { const provider = providerRef.current\n${hintBranch}\nreturn 'fell-through' }\nreturn { serveTool, pushLocalizerContext, runLocalizer, boundLocalizerTranscript }`
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
   const callbacks = new Function(...Object.keys(env), js)(...Object.values(env))
