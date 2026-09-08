@@ -20,6 +20,13 @@ import { MicCapture } from '@/lib/voice/audio/capture-worklet'
 import { PcmPlayer } from '@/lib/voice/audio/player'
 import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/providerTypes'
 
+/**
+ * Cap on how long stop() will wait for queued audio to finish draining
+ * before closing the player anyway. Guards against a hung/undelivered
+ * 'drained' report stalling teardown indefinitely — see stop() below.
+ */
+const STOP_DRAIN_CAP_MS = 8000
+
 export class NovaSonicWsProvider implements VoiceProvider {
   private ws: WebSocket | null = null
   private mic: MicCapture | null = null
@@ -295,6 +302,20 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     if (this.player) {
+      // Let any already-queued audio (e.g. a closing goodbye) actually play
+      // out before the player is torn down — mirrors emitAiSpeechStopWhenDrained,
+      // and fixes the prod cutoff (run 22350e76, 2026-09-08): the old code
+      // closed the player as soon as mic teardown finished, regardless of
+      // whether the AI's closing line had actually finished playing.
+      // Race against a hard cap so a stuck/undelivered drain report (or a
+      // player with no working drain signal at all) can never stall stop().
+      // Never throws: whenDrained() rejecting would otherwise abort stop()
+      // before the socket/mic teardown below completes.
+      await Promise.race([
+        this.player.whenDrained().catch(() => {}),
+        new Promise<void>((resolve) => setTimeout(resolve, STOP_DRAIN_CAP_MS)),
+      ])
+
       // Stash a final diagnostics snapshot before close() tears the worklet
       // node down — getAudioDiagnostics() would otherwise have nothing to
       // return once `player` is gone. Best-effort: never let this block or

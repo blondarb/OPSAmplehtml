@@ -20,6 +20,7 @@
 import { pcmFromBase64 } from './pcm';
 import { makeResampleState, resamplePcm16, type ResampleState } from './resample';
 import { PCM_STREAM_WORKLET_SRC } from './pcmStreamWorklet';
+import { DrainTracker } from './drainTracker';
 
 const SOURCE_RATE = 24000; // Nova Sonic PCM chunk rate
 // Fallback-path jitter buffer: restart this far ahead of the clock when the
@@ -29,14 +30,17 @@ const JITTER_S = 0.18;
 export class PcmPlayer {
   private ctx: AudioContext | null = null;
   private resampleState: ResampleState = makeResampleState();
-  private drainWaiters: Array<() => void> = [];
+  // Turns the raw "queue emptied" signal (worklet 'drained' message, or the
+  // fallback's activeSources hitting 0) into a real "playback finished"
+  // signal — see drainTracker.ts for why a raw drain report can't be trusted
+  // directly (a momentary underrun mid-sentence looks identical to done).
+  private drainTracker = new DrainTracker();
 
   // --- worklet path ---
   private workletNode: AudioWorkletNode | null = null;
   private useWorklet = true;
   private workletSetup: Promise<void> | null = null;
   private pendingPushes: Float32Array[] = []; // buffered until the node is ready
-  private workletActive = false; // audio pushed since the last drain report
 
   // --- diagnostics (iOS crackle instrumentation, 2026-07-11) ---
   /** Most recent stats payload seen from any worklet message carrying `.stats`
@@ -92,15 +96,11 @@ export class PcmPlayer {
   }
 
   private onWorkletDrained(): void {
-    this.workletActive = false;
-    this.flushDrainWaiters();
-  }
-
-  private flushDrainWaiters(): void {
-    if (this.drainWaiters.length === 0) return;
-    const waiters = this.drainWaiters;
-    this.drainWaiters = [];
-    for (const resolve of waiters) resolve();
+    // NOT an immediate "done" — see DrainTracker. Nova streams PCM in small
+    // chunks with small gaps; a momentary underrun mid-sentence reports
+    // 'drained' too, so this only starts a short grace timer. If more audio
+    // is enqueued before it fires, the report is treated as a false alarm.
+    this.drainTracker.drainedReported();
   }
 
   /** Decode a base64 24 kHz PCM16 chunk and stream it for gapless playback. */
@@ -114,8 +114,9 @@ export class PcmPlayer {
     const float = resamplePcm16(pcm, SOURCE_RATE, ctx.sampleRate, this.resampleState);
     if (float.length === 0) return;
 
+    this.drainTracker.audioEnqueued();
+
     if (this.useWorklet) {
-      this.workletActive = true;
       if (this.workletNode) {
         this.workletNode.port.postMessage({ type: 'push', samples: float }, [float.buffer]);
       } else {
@@ -142,22 +143,22 @@ export class PcmPlayer {
     this.activeSources.add(src);
     src.onended = () => {
       this.activeSources.delete(src);
-      if (this.activeSources.size === 0) this.flushDrainWaiters();
+      // Same "don't trust the first empty report" logic as the worklet path
+      // (see onWorkletDrained / DrainTracker) — a grace window, not an
+      // immediate resolve.
+      if (this.activeSources.size === 0) this.drainTracker.drainedReported();
     };
   }
 
   /**
-   * Resolves once all currently queued PCM has finished playing. Resolves
-   * immediately if nothing is queued; if more audio is enqueued before draining
-   * completes, the wait naturally extends to cover it.
+   * Resolves once all currently queued PCM has genuinely finished playing —
+   * not merely reported as drained (see DrainTracker for why the raw signal
+   * can't be trusted directly). Resolves immediately if nothing is queued;
+   * if more audio is enqueued before draining completes, the wait naturally
+   * extends to cover it.
    */
   whenDrained(): Promise<void> {
-    if (this.useWorklet) {
-      if (!this.workletActive) return Promise.resolve();
-      return new Promise<void>((resolve) => this.drainWaiters.push(resolve));
-    }
-    if (this.activeSources.size === 0) return Promise.resolve();
-    return new Promise<void>((resolve) => this.drainWaiters.push(resolve));
+    return this.drainTracker.whenDrained();
   }
 
   /**
@@ -215,7 +216,6 @@ export class PcmPlayer {
   /** Barge-in: drop all queued/playing audio immediately; context stays open. */
   interrupt(): void {
     this.workletNode?.port.postMessage({ type: 'clear' });
-    this.workletActive = false;
     this.pendingPushes = [];
     for (const src of this.activeSources) {
       try { src.stop(); } catch { /* already ended */ }
@@ -223,7 +223,9 @@ export class PcmPlayer {
     this.activeSources.clear();
     this.nextStartTime = 0;
     this.resampleState = makeResampleState();
-    this.flushDrainWaiters();
+    // Audio is being discarded, not allowed to finish — resolve waiters now,
+    // no grace window (unlike a normal drain report).
+    this.drainTracker.flushNow();
   }
 
   /** Stop everything and permanently close the AudioContext. Idempotent. */
