@@ -13,7 +13,11 @@ import type { ClientMsg, ServerMsg } from './wsProtocol.js'
 // unauthenticated for the ALB health check.
 // ---------------------------------------------------------------------------
 
-const server = http.createServer((req, res) => {
+// Exported only so src/__tests__/server.test.ts can close the listener it
+// picks up as an import side effect (tests set PORT=0 — an ephemeral port,
+// never the real one) — production wiring (module-level `server.listen(...)`
+// below) is unchanged.
+export const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' })
     res.end('ok')
@@ -172,13 +176,29 @@ const TRACE: (m: string) => void = process.env.RELAY_TRACE
   ? (m: string) => console.log(`[trace ${new Date().toISOString().slice(11, 23)}] ${m}`)
   : () => {}
 
-wss.on('connection', (ws) => {
+/**
+ * Per-connection handler — exported (only) so `src/__tests__/server.test.ts`
+ * can drive it against a fake `ws` (satisfying just the `on`/`send`/`close`/
+ * `readyState` surface this function actually uses) instead of standing up a
+ * real WebSocket server + auth handshake + live Bedrock stream. Production
+ * wiring is unchanged: `wss.on('connection', handleConnection)` below.
+ */
+export function handleConnection(ws: WebSocket): void {
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
   // aiSpeechStart on the first audio chunk after silence, and aiSpeechStop on
   // completionEnd or bargeIn. A precise turn model would require richer signals
   // from the model, but this is sufficient for rendering and barge-in UX.
   let aiSpeaking = false
+
+  // Set once teardown has started (via the 'stop' message or a fatal
+  // onError), by either the 'stop' message handler or onError below —
+  // whichever runs first wins. Guards against a double ws.close() (calling
+  // close() twice, or closing after 'stop' already started closing) when
+  // both paths could plausibly fire close together (e.g. the graceful
+  // sessionEnd sequence sent during stop() itself surfaces as a stream
+  // error/exception).
+  let closing = false
 
   function startAiSpeech(): void {
     if (!aiSpeaking) {
@@ -250,6 +270,34 @@ wss.on('connection', (ws) => {
       }
       console.error('[nova-session] stream error:', message, err)
       send(ws, { t: 'error', message })
+
+      // Every onError call is stream-terminating, not an advisory notice:
+      // NovaSonicSession invokes this callback from exactly three places
+      // (novaSonicSession.ts) — the client.send() catch in start() (stream
+      // never opened; session is reset to closed/inactive before the
+      // callback fires), the modelStreamErrorException/internalServerException
+      // branches inside runResponseLoop's for-await, and that same loop's
+      // catch block — and the latter two are always immediately followed by
+      // `this.active = false` in the loop's `finally`. So by the time onError
+      // runs, the underlying Bedrock bidi stream is already over in every
+      // case; there is no "recoverable" error variant to special-case on
+      // message/name. Leaving the client ws open here was the bug: it kept
+      // accepting `audio` messages into a dead Nova stream, so a patient saw
+      // a silently frozen interviewer for ~100s instead of a closed session.
+      // Best-effort teardown, then close so the browser's onclose fires
+      // `disconnected` and the hook runs the graceful-end (flush + save)
+      // flow, matching the existing 'stop' case below.
+      if (closing) return // 'stop' (or a prior onError) already started teardown
+      closing = true
+      transcribe?.stop().catch(() => {})
+      session.stop().catch(() => {})
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        try {
+          ws.close(1011, 'nova stream error')
+        } catch {
+          // best-effort — the socket may already be tearing down
+        }
+      }
     },
   })
 
@@ -317,6 +365,8 @@ wss.on('connection', (ws) => {
           break
 
         case 'stop':
+          if (closing) break // onError already started teardown — don't double-close
+          closing = true
           transcribe?.stop().catch(() => {})
           session.stop().then(() => {
             ws.close()
@@ -343,7 +393,9 @@ wss.on('connection', (ws) => {
     session.stop().catch(() => {})
     transcribe?.stop().catch(() => {})
   })
-})
+}
+
+wss.on('connection', handleConnection)
 
 // ---------------------------------------------------------------------------
 // Start listening
