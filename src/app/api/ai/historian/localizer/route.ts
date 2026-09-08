@@ -20,6 +20,7 @@ import { invokeBedrockJSON } from '@/lib/bedrock'
 import { buildAttendingTranscriptWindow, getAttendingConfig, isAttendingSafetyEscalated, shouldRunAttending } from '@/lib/consult/attendingGaps'
 import { buildAttendingPrompt } from '@/lib/consult/attendingPrompt'
 import { sanitizeAttendingGaps } from '@/lib/consult/attendingSanitize'
+import { extractAskedQuestions } from '@/lib/historian/askedQuestions'
 import { from } from '@/lib/db-query'
 import { getNeuroPlansPool, getPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
@@ -65,6 +66,7 @@ const STEER_GENERATOR_PROMPT = `Generate a compact steer for an in-progress pati
 Return only JSON:
 {"followUpQuestions":["string"],"localizationHypothesis":"string","differential":[{"diagnosis":"string","likelihood":"high | medium | low"}],"suggestedScaleId":null}
 Use at most 3 patient-facing follow-up questions, each containing one question in plain language and no diagnosis names. Target gaps that distinguish the leading possibilities; for follow-up sessions focus on interval change and treatment response.
+questionsAlreadyAsked lists what the interviewer has already asked. Never suggest a question that asks for the same information as any entry there, even reworded. If every remaining gap is already covered, return an empty followUpQuestions array.
 Keep localizationHypothesis at most 160 characters; use an empty string if insufficient information.
 List at most 3 differential names with likelihood only, based on reported evidence; default to medium if insufficient data to rank. Do not include rationale, codes, exclusions, or actions.
 Set suggestedScaleId to a matching clinical scale id only when indicated, otherwise null. Available ids: ${STEER_SCALE_IDS.join(', ')}.
@@ -642,6 +644,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         extractedSymptoms: symptoms,
         guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
         transcriptSummary: symptoms.clinicalSummary,
+        questionsAlreadyAsked: extractAskedQuestions(body.fullTranscript ?? transcript),
       })
       await Promise.all([
         timed('step3a_ms', async () => {
