@@ -27,6 +27,13 @@ vi.mock('@/lib/voice/audio/player', () => ({
 
 const { NovaSonicWsProvider } = await import('../novaSonicWsProvider')
 
+// CI's Node has no global CloseEvent (newer local Node does) — build the
+// minimal shape the provider's onclose reads instead of constructing one.
+function closeEvent(init: { code: number; reason: string; wasClean: boolean }): CloseEvent {
+  return { type: 'close', ...init } as unknown as CloseEvent
+}
+
+
 // ---------------------------------------------------------------------------
 // Fake WebSocket — mirrors the browser WebSocket surface the provider uses
 // (readyState, onopen/onmessage/onerror/onclose, send, close). Instances are
@@ -101,7 +108,7 @@ describe('NovaSonicWsProvider — relay error then close(1011)', () => {
     // wasClean: true even though the code is not 1000 — this is the exact
     // shape that previously got swallowed by the `!event.wasClean` check.
     ws.readyState = FakeWebSocket.CLOSED
-    ws.onclose?.(new CloseEvent('close', { code: 1011, reason: 'nova stream error', wasClean: true }))
+    ws.onclose?.(closeEvent({ code: 1011, reason: 'nova stream error', wasClean: true }))
 
     const errorEvents = events.filter((e) => e.type === 'error')
     const disconnectedEvents = events.filter((e) => e.type === 'disconnected')
@@ -131,7 +138,7 @@ describe('NovaSonicWsProvider — relay error then close(1011)', () => {
     await provider.stop()
     // The provider's own stop() calls ws.close() with no arguments, i.e. code
     // 1000; the real browser would then fire onclose(code=1000, wasClean=true).
-    ws.onclose?.(new CloseEvent('close', { code: 1000, reason: '', wasClean: true }))
+    ws.onclose?.(closeEvent({ code: 1000, reason: '', wasClean: true }))
 
     expect(events.filter((e) => e.type === 'disconnected')).toHaveLength(0)
   })
@@ -152,7 +159,7 @@ describe('NovaSonicWsProvider — relay error then close(1011)', () => {
     ws.onopen?.()
 
     ws.readyState = FakeWebSocket.CLOSED
-    ws.onclose?.(new CloseEvent('close', { code: 1006, reason: '', wasClean: false }))
+    ws.onclose?.(closeEvent({ code: 1006, reason: '', wasClean: false }))
 
     expect(events.filter((e) => e.type === 'disconnected')).toHaveLength(1)
   })
