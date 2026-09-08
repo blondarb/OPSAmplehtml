@@ -19,6 +19,7 @@ import {
   type UnresponsivenessMonitor,
 } from '@/lib/voice/unresponsiveness'
 import { ATTENDING_HINT_TOOL_NAME, buildNovaHint } from '@/lib/historian/novaSteer'
+import { resolveLocalizerSessionId } from '@/lib/historian/localizerSessionKey'
 
 // Preserve turn roles and the newest text, including a partial oldest turn.
 function boundLocalizerTranscript(turns: HistorianTranscriptEntry[]) {
@@ -512,7 +513,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           mode: 'steer',
           // Ask for detail_input only when this client will make the detail call (clinician mirror).
           wantDetail: options.localizerDetail === true,
-          sessionId: options.consultId ?? 'ephemeral',
+          sessionId: resolveLocalizerSessionId(serverSessionIdRef.current, options.consultId),
           sessionType: options.sessionType,
           localizerCycle,
           safetyEscalated: safetyEscalatedRef.current,
@@ -569,7 +570,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               signal: detailController.signal,
-              body: JSON.stringify({ mode: 'detail', sessionId: options.consultId ?? 'ephemeral', detail_input }),
+              body: JSON.stringify({
+                mode: 'detail',
+                sessionId: resolveLocalizerSessionId(serverSessionIdRef.current, options.consultId),
+                detail_input,
+              }),
             })
             if (!detailRes.ok) return
             const detail: LocalizerResponse = await detailRes.json()
