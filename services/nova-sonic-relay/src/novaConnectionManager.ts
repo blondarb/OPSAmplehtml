@@ -57,6 +57,49 @@ const RENEWAL_NOTE =
 
 type RenewalReason = 'scheduled' | 'quiet-point' | 'hard-deadline' | 'reactive'
 
+// ---------------------------------------------------------------------------
+// sanitizeHistoryForNova
+//
+// Production failure (verified 2026-09-08, CloudWatch /ecs/nova-sonic-relay):
+// a renewal fired at the hard deadline, seeded the new session with the raw
+// accumulated history — whose first turn is Henry's ASSISTANT greeting — and
+// Nova immediately failed the new stream with "First message in chat history
+// should not be Assistant." Nova is designed for alternating user/assistant
+// turns (AWS Nova user guide / speech-troubleshooting docs: "ensure the
+// first message in the chat history originates from the user"), and the
+// manager's own accumulation can also produce back-to-back same-role turns
+// (e.g. a stacked ASSISTANT/ASSISTANT pair when the model asks a follow-up
+// with no intervening USER turn). This pure function repairs both before the
+// history is replayed into a renewed connection.
+// ---------------------------------------------------------------------------
+
+/**
+ * Sanitize accumulated history so it is safe to seed into a fresh Nova
+ * session: (a) drop leading turns until the first USER turn, (b) merge
+ * consecutive same-role turns (joining text with a single space), and
+ * (c) drop empty-text turns. Pure — does not mutate the input.
+ */
+export function sanitizeHistoryForNova(turns: HistoryTurn[]): HistoryTurn[] {
+  const nonEmpty = turns.filter((turn) => turn.text.length > 0)
+
+  let start = 0
+  while (start < nonEmpty.length && nonEmpty[start].role !== 'USER') {
+    start++
+  }
+  const trimmed = nonEmpty.slice(start)
+
+  const merged: HistoryTurn[] = []
+  for (const turn of trimmed) {
+    const last = merged[merged.length - 1]
+    if (last && last.role === turn.role) {
+      last.text = `${last.text} ${turn.text}`
+    } else {
+      merged.push({ role: turn.role, text: turn.text })
+    }
+  }
+  return merged
+}
+
 /** The subset of NovaSonicSession's public surface this class depends on — narrowed so tests can inject a fake without importing the real (Bedrock-backed) class. */
 export interface NovaSonicSessionLike {
   start(instructions: string, tools: Tool[], voiceId?: string, options?: NovaSonicStartOptions): Promise<void>
@@ -211,9 +254,12 @@ export class NovaConnectionManager {
 
     this.renewTimer = setTimeout(() => {
       const elapsedMs = Date.now() - this.connectionStartTime
-      this.log(`scheduled reason=timer elapsedMs=${elapsedMs}`)
+      const quiet = this.isQuietPoint()
+      this.log(
+        `scheduled reason=timer elapsedMs=${elapsedMs} quiet=${quiet} speaking=${this.speaking} toolOutstanding=${this.toolCallOutstanding}`,
+      )
       this.renewalDue = true
-      if (this.isQuietPoint()) {
+      if (quiet) {
         void this.startRenewal('scheduled')
       }
     }, this.renewAfterMs)
@@ -231,6 +277,20 @@ export class NovaConnectionManager {
 
   private isQuietPoint(): boolean {
     return !this.speaking && !this.toolCallOutstanding
+  }
+
+  /**
+   * Shared by the onTurnEnd and onCompletionEnd callbacks (see
+   * makeCallbacksFor): if a renewal is due and the connection is otherwise
+   * quiet (no outstanding tool call, no renewal already in flight), start
+   * it now. Factored into one method so the two quiet-point signals cannot
+   * drift out of sync with each other.
+   */
+  private checkQuietPointRenewal(): void {
+    if (this.renewalDue && !this.toolCallOutstanding && !this.renewing) {
+      this.renewalDue = false
+      void this.startRenewal('quiet-point')
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -252,7 +312,10 @@ export class NovaConnectionManager {
 
     const attemptStartedAt = Date.now()
     const historySnapshot = this.history.slice()
-    this.log(`started reason=${reason} historyTurns=${historySnapshot.length}`)
+    const sanitizedHistory = sanitizeHistoryForNova(historySnapshot)
+    this.log(
+      `started reason=${reason} historyTurns=${historySnapshot.length} seeded=${sanitizedHistory.length}`,
+    )
 
     const oldSession = this.currentSession
     const generation = ++this.sessionSeq
@@ -263,7 +326,7 @@ export class NovaConnectionManager {
 
     try {
       await newSession.start(renewedInstructions, this.tools, this.voiceId, {
-        history: historySnapshot,
+        history: sanitizedHistory,
         skipGreeting: true,
       })
     } catch (e) {
@@ -298,7 +361,9 @@ export class NovaConnectionManager {
     this.scheduleTimers()
 
     const elapsedMs = Date.now() - attemptStartedAt
-    this.log(`switched historyTurns=${historySnapshot.length} elapsedMs=${elapsedMs}`)
+    this.log(
+      `switched historyTurns=${historySnapshot.length} seeded=${sanitizedHistory.length} elapsedMs=${elapsedMs}`,
+    )
 
     oldSession.stop().catch(() => {})
 
@@ -343,10 +408,20 @@ export class NovaConnectionManager {
         if (!isCurrent()) return
         this.speaking = false
         this.externalCallbacks.onCompletionEnd?.()
-        if (this.renewalDue && !this.toolCallOutstanding && !this.renewing) {
-          this.renewalDue = false
-          void this.startRenewal('quiet-point')
-        }
+        this.checkQuietPointRenewal()
+      },
+
+      // Per-turn quiet point — see NovaSonicCallbacks.onTurnEnd. Handled
+      // identically to onCompletionEnd (same speaking-reset + renewal check)
+      // so the two signals can't drift; the shared logic lives in
+      // checkQuietPointRenewal(). In production this fires far more
+      // reliably than completionEnd, so it's the primary signal in
+      // practice — completionEnd stays wired as a secondary check.
+      onTurnEnd: () => {
+        if (!isCurrent()) return
+        this.speaking = false
+        this.externalCallbacks.onTurnEnd?.()
+        this.checkQuietPointRenewal()
       },
 
       onBargeIn: () => {
