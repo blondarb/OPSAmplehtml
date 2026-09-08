@@ -246,6 +246,8 @@ export interface HistorianEvalAggregates {
   deterministicDiagnosisLeakCount: number
   /** Summed count of non-final assistant turns matching FALSE_CLOSING_PATTERNS across evaluable cases (RULE 12 drift; see deterministicChecks.ts). Not wired to a release gate — reporting only. */
   deterministicFalseClosingCount: number
+  /** Summed count of stacked-question assistant turns across evaluable cases (RULE 1 drift; see deterministicChecks.ts's countStackedQuestions). Not wired to a release gate — reporting only. */
+  deterministicStackedQuestionCount: number
   pipelineGroundTruthTop1: RateStat
   pipelineGroundTruthTop3: RateStat
   independentGroundTruthTop1: RateStat
@@ -383,6 +385,9 @@ export function aggregateHistorianEvalCases(cases: HistorianEvalCaseOutcome[]): 
   const deterministicFalseClosingCount = evaluableCases
     .filter((c) => c.thoroughness.ok && c.thoroughness.result)
     .reduce((sum, c) => sum + c.thoroughness.result!.deterministic.falseClosings.count, 0)
+  const deterministicStackedQuestionCount = evaluableCases
+    .filter((c) => c.thoroughness.ok && c.thoroughness.result)
+    .reduce((sum, c) => sum + c.thoroughness.result!.deterministic.stackedQuestions.count, 0)
 
   const pipelineGroundTruthTop1 = computeRate(
     evaluableCases.filter((c) => c.groundTruth?.pipeline).map((c) => c.groundTruth!.pipeline!.top1Hit),
@@ -411,6 +416,7 @@ export function aggregateHistorianEvalCases(cases: HistorianEvalCaseOutcome[]): 
     agreementJaccardTop3,
     deterministicDiagnosisLeakCount,
     deterministicFalseClosingCount,
+    deterministicStackedQuestionCount,
     pipelineGroundTruthTop1,
     pipelineGroundTruthTop3,
     independentGroundTruthTop1,
@@ -777,6 +783,7 @@ export function formatHistorianEvalMarkdown(report: HistorianEvalReport): string
     `- Agreement Jaccard top-3: ${fmtRange(report.aggregates.agreementJaccardTop3)}`,
     `- Deterministic diagnosis-leak count (summed): ${report.aggregates.deterministicDiagnosisLeakCount}`,
     `- Deterministic false-closing count (summed, non-final assistant turns): ${report.aggregates.deterministicFalseClosingCount}`,
+    `- Deterministic stacked-question count (summed, RULE 1 drift): ${report.aggregates.deterministicStackedQuestionCount}`,
     `- Pipeline ground-truth hit rate: top1=${fmtRate(report.aggregates.pipelineGroundTruthTop1)} top3=${fmtRate(report.aggregates.pipelineGroundTruthTop3)}`,
     `- Independent ground-truth hit rate: top1=${fmtRate(report.aggregates.independentGroundTruthTop1)} top3=${fmtRate(report.aggregates.independentGroundTruthTop3)}`,
     `- Independent/pipeline top-3 agreement rate (>=1 overlap): ${fmtRate(report.aggregates.independentAgreementTop3)}`,

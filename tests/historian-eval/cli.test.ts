@@ -314,6 +314,7 @@ describe('runHistorianEvalCli', () => {
               diagnosisLeak: { leaked: false, matches: [] },
               phaseMarkers: { openingPresent: false, closingPresent: false },
               falseClosings: { count: 0, turnIndexes: [] },
+              stackedQuestions: { count: 0, turns: [] },
               turnCap: { patientTurnCount: 1, limit: 25, exceeded: false },
               structuredOutput: { valid: false, issues: [] },
               criticalCoverage: [],
