@@ -20,6 +20,11 @@
  *      question. Counts non-final ASSISTANT turns matching
  *      FALSE_CLOSING_PATTERNS; flags >=2 as RULE 12 drift (1 is expected
  *      from the preclose gate's single legitimate false close).
+ *   2c. Stacked-question counter — CORE_PROMPT RULE 1 requires one
+ *      question at a time. Flags an ASSISTANT turn with two or more '?'
+ *      characters, or one ending in '?' immediately after another
+ *      ASSISTANT turn ending in '?' with no patient turn between; any
+ *      occurrence is RULE 1 drift.
  *   3. Turn cap — the historian's own CRITICAL RULE 13 caps at 25 patient
  *      turns; flags a session that exceeded it.
  *   4. Structured-output shape — the required fields on
@@ -267,6 +272,68 @@ export function countFalseClosings(transcript: HistorianTranscriptEntry[]): Fals
 /** count >= this many non-final false-closing turns is flagged as an issue — 1 is expected from the preclose gate, so the threshold is 2. */
 export const FALSE_CLOSING_ISSUE_THRESHOLD = 2
 
+// ── 2c. Stacked-question counter (RULE 1 drift) ─────────────────────────────
+//
+// CORE_PROMPT RULE 1 in historianPrompts.ts requires "Ask ONE question at a
+// time". A real 2026-09-08 interview broke this twice in 40 turns despite
+// the rule: once as a single assistant turn asking two questions in one
+// breath ("...are you taking any medicines regularly ... and if so, what are
+// they and how much do you take?"), and once as two consecutive assistant
+// turns with no patient turn between them, each ending in a question — the
+// patient had to ask "what was the other question". Nothing before this
+// check detected either shape.
+
+export interface StackedQuestionTurn {
+  index: number
+  /** The offending turn's own text (assistant-authored transcript text — an audit artifact, never logged to console). */
+  text: string
+  reason: string
+}
+
+export interface StackedQuestionCheckResult {
+  count: number
+  turns: StackedQuestionTurn[]
+}
+
+function countQuestionMarks(text: string): number {
+  return (text.match(/\?/g) || []).length
+}
+
+/**
+ * An assistant turn counts as a stacked-question turn when either:
+ *   (a) its own text contains two or more '?' characters (two questions in
+ *       one breath), or
+ *   (b) it ends with '?' and the immediately preceding transcript entry is
+ *       also an assistant turn ending with '?' (no patient turn between —
+ *       two consecutive planned questions). Only the second of the pair is
+ *       flagged; the first has nothing preceding it that makes it the
+ *       offender.
+ * Each offending turn is counted once even if (a) and (b) both apply.
+ */
+export function countStackedQuestions(transcript: HistorianTranscriptEntry[]): StackedQuestionCheckResult {
+  const turns: StackedQuestionTurn[] = []
+  transcript.forEach((turn, index) => {
+    if (turn.role !== 'assistant') return
+    if (countQuestionMarks(turn.text) >= 2) {
+      turns.push({ index, text: turn.text, reason: 'two or more question marks in one assistant turn' })
+      return
+    }
+    if (!turn.text.trim().endsWith('?')) return
+    const prev = transcript[index - 1]
+    if (prev && prev.role === 'assistant' && prev.text.trim().endsWith('?')) {
+      turns.push({
+        index,
+        text: turn.text,
+        reason: 'consecutive assistant turns ending in a question with no patient turn between',
+      })
+    }
+  })
+  return { count: turns.length, turns }
+}
+
+/** count >= this many stacked-question turns is flagged as an issue — any occurrence is RULE 1 drift, so the threshold is 1. */
+export const STACKED_QUESTION_ISSUE_THRESHOLD = 1
+
 // ── 3. Turn cap ───────────────────────────────────────────────────────────────
 
 export interface TurnCapCheckResult {
@@ -374,6 +441,7 @@ export interface DeterministicCheckResult {
   diagnosisLeak: DiagnosisLeakCheckResult
   phaseMarkers: PhaseMarkerCheckResult
   falseClosings: FalseClosingCheckResult
+  stackedQuestions: StackedQuestionCheckResult
   turnCap: TurnCapCheckResult
   structuredOutput: StructuredOutputCheckResult
   criticalCoverage: CriticalCoverageEntry[]
@@ -390,6 +458,7 @@ export function runDeterministicChecks(
   const diagnosisLeak = scanForDiagnosisLeak(transcript)
   const phaseMarkers = checkPhaseMarkers(transcript)
   const falseClosings = countFalseClosings(transcript)
+  const stackedQuestions = countStackedQuestions(transcript)
   const turnCap = checkTurnCap(transcript)
   const structuredOutputResult = checkStructuredOutputValidity(structuredOutput, narrativeSummary)
   const criticalCoverage = computeCriticalCoverage(transcript, criticalQuestions)
@@ -409,6 +478,9 @@ export function runDeterministicChecks(
       `false closing phrases in ${falseClosings.count} non-final assistant turns (RULE 12 drift; 1 is expected from the preclose gate)`,
     )
   }
+  if (stackedQuestions.count >= STACKED_QUESTION_ISSUE_THRESHOLD) {
+    issues.push(`stacked questions in ${stackedQuestions.count} assistant turns (RULE 1 drift)`)
+  }
   if (turnCap.exceeded) {
     issues.push(`patient turn count ${turnCap.patientTurnCount} exceeds the ${turnCap.limit}-turn cap`)
   }
@@ -418,6 +490,7 @@ export function runDeterministicChecks(
     diagnosisLeak,
     phaseMarkers,
     falseClosings,
+    stackedQuestions,
     turnCap,
     structuredOutput: structuredOutputResult,
     criticalCoverage,
