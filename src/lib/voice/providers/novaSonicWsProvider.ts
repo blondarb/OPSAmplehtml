@@ -131,7 +131,17 @@ export class NovaSonicWsProvider implements VoiceProvider {
       // drop handling and a manual "End Interview" click — flush
       // save_interview_output, fall back to a raw-transcript narrative, tear
       // down, fire onComplete.
-      if (!this.closing && !event.wasClean && event.code !== 1000) {
+      //
+      // NOTE: `event.wasClean` reflects whether the closing HANDSHAKE
+      // completed (both sides exchanged Close frames), not whether the code
+      // is 1000. A server-initiated close with a fatal, non-1000 code (e.g.
+      // the relay's onError path closing with 1011) still completes the
+      // handshake normally, so `wasClean` is `true` there — checking
+      // `!event.wasClean` (true only for an abrupt 1006 drop) silently
+      // swallowed every OTHER non-1000 close, including this one. `code !==
+      // 1000` alone is the correct "was this expected" check; `wasClean`
+      // adds nothing once `closing` already gates our own clean stop().
+      if (!this.closing && event.code !== 1000) {
         this.emit({ type: 'disconnected', reason: `ws:close(${event.code})` })
       }
     }

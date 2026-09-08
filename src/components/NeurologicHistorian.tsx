@@ -9,6 +9,7 @@ import { getTenantClient } from '@/lib/tenant'
 import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
 import HistorianInterviewStep from './historian/HistorianInterviewStep'
+import HistorianInterruptionAlert from './historian/HistorianInterruptionAlert'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
@@ -846,6 +847,9 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         )}
 
         {/* ====== STEP 3 — INTERVIEW ====== */}
+        {(phase === 'active' || phase === 'ending') && (
+          <HistorianInterruptionAlert error={error} />
+        )}
         {(phase === 'active' || phase === 'ending') && (
           <HistorianInterviewStep
             phase={phase}
