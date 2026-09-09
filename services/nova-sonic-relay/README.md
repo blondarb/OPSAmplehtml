@@ -27,6 +27,9 @@ Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults 
 | `TRANSCRIBE_MEDICAL_ENABLED` | `false` | **Flag-gated, off by default.** When `true`/`1`, the relay opens a second, parallel AWS Transcribe Medical streaming session per call on the same caller audio Nova Sonic receives, and emits `medicalTranscript` messages (`{ t: 'medicalTranscript', text, isPartial }`) alongside Nova's own transcripts — a higher-accuracy cross-check on spoken identifiers (MRN/name/DOB) that Nova Sonic (speech-to-speech) is prone to dropping digits from. Fail-safe: any Transcribe Medical error is logged and the session goes inert; the Nova Sonic call is never affected. Requires the task role to have `transcribe:StartMedicalStreamTranscription`. See `src/transcribeMedicalSession.ts`. |
 | `NOVA_RENEW_AFTER_MS` | `420000` (7:00) | See [8-minute connection renewal](#8-minute-connection-renewal) below. |
 | `NOVA_RENEW_HARD_MS` | `465000` (7:45) | See [8-minute connection renewal](#8-minute-connection-renewal) below. |
+| `NOVA_KEEPALIVE_IDLE_MS` | `2000` | See [Silence keepalive](#silence-keepalive) below. |
+| `NOVA_KEEPALIVE_MAX_IDLE_MS` | `180000` (3:00) | See [Silence keepalive](#silence-keepalive) below. |
+| `NOVA_KEEPALIVE_DISABLED` | *(unset)* | Set to `1` to turn the silence keepalive off (kill switch). |
 
 ### WebSocket authentication
 
@@ -52,8 +55,25 @@ Amazon Nova 2 Sonic enforces a hard **~8-minute limit per bidirectional stream**
 - **What happens:** a second `NovaSonicSession` opens with the same instructions/tools/voice, seeded with the accumulated conversation (every USER/ASSISTANT turn the old session forwarded, capped at ~60k characters, oldest dropped first, then run through `sanitizeHistoryForNova()` — see below) plus a one-line system note telling the model to continue, not re-greet. Once that new stream is open, the manager atomically switches audio/tool-result/system-text routing and callbacks to it, then stops the old session in the background. The client WebSocket is never touched.
 - **History sanitization (`sanitizeHistoryForNova()` in `src/novaConnectionManager.ts`):** Nova requires the seeded history to start with a USER turn and rejects a leading ASSISTANT turn outright ("First message in chat history should not be Assistant" — a real production failure on 2026-09-08, since the interview's first accumulated turn is always the assistant's own greeting). Nova is also designed for strictly alternating user/assistant turns, and the manager's own accumulation can produce back-to-back same-role turns (e.g. two assistant turns with no intervening user reply). Before seeding, the accumulated history is: (1) trimmed of any leading turns until the first USER turn, (2) had consecutive same-role turns merged into one (text joined with a single space), and (3) had any empty-text turns dropped. If nothing survives, `history: []` is passed rather than seeding anything. This is a pure function, unit-tested independently of the renewal flow.
 - **Reactive fallback:** if the *old* connection errors (e.g. Nova's own timeout fires) before a scheduled renewal completed, the manager attempts one renewal immediately. Only if that attempt also fails does it fall back to the existing graceful-close behavior (PR #234: relay closes the client ws with code `1011`, the browser ends the interview with the transcript already saved).
-- **Rate limit:** at most one renewal attempt per 60 seconds.
+- **Rate limit:** at most one renewal attempt per 60 seconds. Deliberately not bypassed for Nova's "Timed out waiting for audio bytes" error — a renewal into another stream that still gets no audio dies the same way 55s later, so a bypass would just loop dead streams. The [silence keepalive](#silence-keepalive) removes the cause instead.
+- **Greeting on an early renewal:** a renewal that fires before the model has produced any ASSISTANT text or audio (i.e. before the greeting) does **not** pass `skipGreeting` and does not append the "continue, don't re-greet" note — the renewed stream opens with the normal greeting kickoff. Otherwise a very early reactive renewal produced a session in which the interviewer never spoke first (production 2026-09-08). `started` log lines carry `skipGreeting=<bool>`.
 - **What the browser sees:** nothing — no reconnect, no gap in audio/transcript, no re-greeting. Operationally, `[nova-renew] ...` lines in the relay log (`scheduled` / `started` / `switched` / `failed` — never transcript text) are the only visible trace. The `scheduled reason=timer` line now also logs `quiet=<bool> speaking=<bool> toolOutstanding=<bool>`, and `started`/`switched` log `historyTurns=<raw count> seeded=<count after sanitization>`, so a future stall or history problem is diagnosable straight from CloudWatch.
+
+---
+
+## Silence keepalive
+
+Nova Sonic fails a stream after **55 seconds without audio bytes or interactive content** (`Timed out waiting for audio bytes or interactive content. Please ensure gaps between audio bytes and interactive content are less than 55 seconds.`). The browser (`src/lib/voice/providers/novaSonicWsProvider.ts`) sends `start` as soon as the WebSocket opens and only *then* requests the microphone, so a slow permission prompt or device setup means Nova receives no audio at all. The relay's one-shot greeting kickoff (an interactive USER text turn, `NovaSonicSession.sendGreetingKickoff`) goes out at t≈0 in the same flush as the init events, so it cannot hold the stream open — and in the production trace (2026-09-08, CloudWatch `/ecs/nova-sonic-relay`) Nova produced no greeting text either, consistent with the model gating its spoken response on the audio stream actually running. Result: a 55s timeout, a reactive renewal into a second audio-less stream, a second timeout 55s later, and a client closed with an empty run at ~110s.
+
+`NovaConnectionManager` now keeps the audio channel alive itself:
+
+- While **no client audio has arrived for `NOVA_KEEPALIVE_IDLE_MS`** (default 2s — measured from stream open, or from the last client `audio` message), it pushes a 250ms frame of digital silence (all-zero PCM16 @16k mono, byte-identical to a muted mic — `silencePcmBase64()` in `src/audioConstants.ts`) into the **current** session's audio content every 250ms, i.e. at real-time cadence. This is the same pattern AWS's own samples use when the microphone is muted.
+- It **stops on the first client `audio` message** and resumes if client audio is absent again for the idle threshold (a mid-session mic drop).
+- One manager-level interval, not per session, so it carries across connection renewals unchanged.
+- It **gives up after `NOVA_KEEPALIVE_MAX_IDLE_MS`** (default 3:00) without any client audio, so a tab abandoned before the mic was granted cannot hold a Bedrock stream open indefinitely; past that, Nova's own timeout and the existing onError → renewal → `close(1011)` path end the session as before.
+- Silence frames go to Nova only — never to the optional Transcribe Medical stream, which still sees exactly the client's audio.
+- Log lines (never transcript text): `[nova-renew] keepalive started reason=no-client-audio-yet|client-audio-gap idleMs=…`, `keepalive stopped reason=client-audio framesSent=…`, `keepalive gave-up idleMs=… maxIdleMs=… framesSent=…`.
+- Kill switch: `NOVA_KEEPALIVE_DISABLED=1`.
 
 ---
 
