@@ -14,16 +14,34 @@ vi.mock('@/lib/voice/audio/capture-worklet', () => ({
   },
 }))
 
-const playerWhenDrained = vi.fn(async () => {})
+// Controllable whenDrained: by default resolves immediately (matches most
+// tests' expectations); switch to 'manual' mode to hold it open and resolve
+// it explicitly, for the stop()-waits-for-drain tests below.
+let whenDrainedMode: 'immediate' | 'manual' = 'immediate'
+let whenDrainedResolvers: Array<() => void> = []
+
+const playerWhenDrained = vi.fn(() => {
+  if (whenDrainedMode === 'immediate') return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    whenDrainedResolvers.push(resolve)
+  })
+})
+const playerClose = vi.fn(async () => {})
 vi.mock('@/lib/voice/audio/player', () => ({
   PcmPlayer: class {
     enqueue = vi.fn()
     interrupt = vi.fn()
-    close = vi.fn(async () => {})
+    close = playerClose
     whenDrained = playerWhenDrained
     getDiagnostics = vi.fn(async () => ({}))
   },
 }))
+
+function resolveAllWhenDrained(): void {
+  const resolvers = whenDrainedResolvers
+  whenDrainedResolvers = []
+  for (const resolve of resolvers) resolve()
+}
 
 const { NovaSonicWsProvider } = await import('../novaSonicWsProvider')
 
@@ -77,6 +95,9 @@ describe('NovaSonicWsProvider — relay error then close(1011)', () => {
     micStart.mockClear()
     micStop.mockClear()
     playerWhenDrained.mockClear()
+    playerClose.mockClear()
+    whenDrainedMode = 'immediate'
+    whenDrainedResolvers = []
     vi.stubGlobal('WebSocket', FakeWebSocket)
   })
 
@@ -162,5 +183,91 @@ describe('NovaSonicWsProvider — relay error then close(1011)', () => {
     ws.onclose?.(closeEvent({ code: 1006, reason: '', wasClean: false }))
 
     expect(events.filter((e) => e.type === 'disconnected')).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// stop() draining a queued closing line before closing the player.
+//
+// Prod context (run 22350e76, 2026-09-08): the historian's closing line
+// arrived as PCM right before `completion`/`aiSpeechStop`, and the old stop()
+// closed the player as soon as mic teardown finished — cutting the goodbye
+// off mid-sentence. stop() must now wait for player.whenDrained() (capped at
+// STOP_DRAIN_CAP_MS) before calling player.close().
+// ---------------------------------------------------------------------------
+
+describe('NovaSonicWsProvider — stop() waits for the player to drain', () => {
+  beforeEach(() => {
+    instances = []
+    micStart.mockClear()
+    micStop.mockClear()
+    playerWhenDrained.mockClear()
+    playerClose.mockClear()
+    whenDrainedMode = 'immediate'
+    whenDrainedResolvers = []
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('does not call player.close() until player.whenDrained() resolves', async () => {
+    whenDrainedMode = 'manual'
+
+    const provider = new NovaSonicWsProvider()
+    provider.on(() => {})
+    await provider.start({
+      relayUrl: 'wss://relay.example/nova',
+      relayToken: 'tok',
+      instructions: 'be a historian',
+      tools: [],
+    })
+    instances[0].onopen?.()
+
+    const stopPromise = provider.stop()
+
+    // Let stop()'s own microtask chain (send stop, await mic.stop()) run
+    // forward until it's blocked on the still-pending whenDrained().
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(playerWhenDrained).toHaveBeenCalled()
+    expect(playerClose).not.toHaveBeenCalled()
+
+    // Now let the queued "goodbye" finish draining.
+    resolveAllWhenDrained()
+    await stopPromise
+
+    expect(playerClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('proceeds to player.close() after STOP_DRAIN_CAP_MS even if whenDrained() never resolves', async () => {
+    vi.useFakeTimers()
+    whenDrainedMode = 'manual' // whenDrained() never resolves on its own
+
+    const provider = new NovaSonicWsProvider()
+    provider.on(() => {})
+    await provider.start({
+      relayUrl: 'wss://relay.example/nova',
+      relayToken: 'tok',
+      instructions: 'be a historian',
+      tools: [],
+    })
+    instances[0].onopen?.()
+
+    const stopPromise = provider.stop()
+
+    // Flush the pre-timer microtask chain (send stop, await mic.stop()).
+    await vi.advanceTimersByTimeAsync(0)
+    expect(playerClose).not.toHaveBeenCalled()
+
+    // Advance past the cap — whenDrainedResolvers is left untouched, so this
+    // only passes if stop() gave up waiting and moved on.
+    await vi.advanceTimersByTimeAsync(8000)
+    await stopPromise
+
+    expect(playerClose).toHaveBeenCalledTimes(1)
   })
 })
