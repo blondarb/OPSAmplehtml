@@ -1,6 +1,7 @@
 import { NovaSonicSession } from './novaSonicSession.js'
 import type { NovaSonicCallbacks, NovaSonicStartOptions, HistoryTurn } from './novaSonicSession.js'
 import type { Tool, HistoryRole } from './eventBuilders.js'
+import { silencePcmBase64 } from './audioConstants.js'
 
 // ---------------------------------------------------------------------------
 // NovaConnectionManager
@@ -37,7 +38,16 @@ import type { Tool, HistoryRole } from './eventBuilders.js'
 //     caller's onError — preserving the existing #234 close(1011) behavior
 //     exactly (server.ts owns that close; this class only decides whether
 //     to attempt a save first).
-//   - Renewal attempts are rate-limited to at most one per 60s.
+//   - Renewal attempts are rate-limited to at most one per 60s. This is
+//     deliberately NOT bypassed for the "Timed out waiting for audio bytes"
+//     error (production 2026-09-08, historian_sessions row 4517ec57): a
+//     renewal into another stream that still receives no audio just dies
+//     the same way 55s later, so bypassing would loop dead streams forever.
+//     The silence keepalive below removes the cause instead.
+//   - A renewal that happens BEFORE the assistant has produced any turn
+//     (no ASSISTANT text or audio seen yet) does not skip the greeting kickoff and
+//     does not append RENEWAL_NOTE — otherwise a very early reactive renewal
+//     yields a session in which the interviewer never speaks first.
 //
 // History accumulation: every USER/ASSISTANT textOutput the wrapped session
 // forwards (already stage-filtered to "final" text by NovaSonicSession — see
@@ -45,12 +55,42 @@ import type { Tool, HistoryRole } from './eventBuilders.js'
 // at ~60k characters (oldest turns dropped first), and replayed into each
 // renewed connection as non-interactive history content (eventBuilders.ts
 // historyContent()).
+//
+// Silence keepalive (production failure 2026-09-08, CloudWatch
+// /ecs/nova-sonic-relay): Nova Sonic fails a stream after 55s without audio
+// bytes or interactive content — "Timed out waiting for audio bytes or
+// interactive content. Please ensure gaps between audio bytes and
+// interactive content are less than 55 seconds." The browser
+// (src/lib/voice/providers/novaSonicWsProvider.ts) sends `start` on ws open
+// and only THEN asks for the microphone, so a slow permission prompt or
+// device setup means Nova gets no audio at all. The one-shot greeting
+// kickoff (an interactive USER text turn, see NovaSonicSession.
+// sendGreetingKickoff) is sent at t≈0 in the same flush as the init events,
+// so it cannot hold the stream open — and in that trace Nova produced no
+// greeting text either, consistent with the model gating its spoken
+// response on the audio stream actually running. Fix: while no client
+// audio has arrived for NOVA_KEEPALIVE_IDLE_MS, push short frames of
+// digital silence (byte-identical to a muted mic) into the current
+// session's audio channel at real-time cadence, and stop the moment client
+// audio resumes. It is bounded by NOVA_KEEPALIVE_MAX_IDLE_MS so a tab the
+// patient walked away from before granting the mic does not hold a Bedrock
+// stream open indefinitely — past that, Nova's own timeout and the existing
+// onError → close(1011) path end the session as before.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_RENEW_AFTER_MS = 420_000 // 7:00
 const DEFAULT_RENEW_HARD_MS = 465_000 // 7:45
 const DEFAULT_MIN_RENEWAL_INTERVAL_MS = 60_000 // never renew more than once/60s
 const DEFAULT_HISTORY_CAP_CHARS = 60_000
+const DEFAULT_KEEPALIVE_IDLE_MS = 2_000 // no client audio for this long → start silence
+const DEFAULT_KEEPALIVE_TICK_MS = 250 // one silence frame per tick while idle
+const DEFAULT_KEEPALIVE_FRAME_MS = 250 // frame length = tick → real-time cadence
+const DEFAULT_KEEPALIVE_MAX_IDLE_MS = 180_000 // give up after 3 min with no client audio
+
+function envMs(name: string, fallback: number): number {
+  const value = Number(process.env[name])
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
 
 const RENEWAL_NOTE =
   '[Connection renewed mid-interview; continue exactly where the conversation left off. Do not greet again or repeat questions.]'
@@ -116,6 +156,16 @@ export interface NovaConnectionManagerOptions {
   hardRenewMs?: number
   minRenewalIntervalMs?: number
   historyCapChars?: number
+  /** Kill switch for the silence keepalive. Defaults to `true` unless NOVA_KEEPALIVE_DISABLED=1. */
+  keepaliveEnabled?: boolean
+  /** No client audio for this long → start pushing silence. Default NOVA_KEEPALIVE_IDLE_MS or 2000. */
+  keepaliveIdleMs?: number
+  /** Cadence of the idle check / silence frames. Default 250. */
+  keepaliveTickMs?: number
+  /** Length of each silence frame. Default 250 (= tick, i.e. real-time). */
+  keepaliveFrameMs?: number
+  /** Stop keeping a session alive once client audio has been absent this long. Default NOVA_KEEPALIVE_MAX_IDLE_MS or 180000. */
+  keepaliveMaxIdleMs?: number
 }
 
 export class NovaConnectionManager {
@@ -152,9 +202,26 @@ export class NovaConnectionManager {
   private lastRenewalCompletedAt: number | null = null
   private pendingReactiveError: unknown = null
   private stopped = false
+  // True once the model has produced any ASSISTANT text or audio on any
+  // generation — the greeting has happened, so a renewal is a continuation.
+  private assistantHasSpoken = false
 
   private renewTimer: ReturnType<typeof setTimeout> | null = null
   private hardTimer: ReturnType<typeof setTimeout> | null = null
+
+  // Silence keepalive state — see the header comment.
+  private readonly keepaliveEnabled: boolean
+  private readonly keepaliveIdleMs: number
+  private readonly keepaliveTickMs: number
+  private readonly keepaliveFrameMs: number
+  private readonly keepaliveMaxIdleMs: number
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null
+  private keepaliveFrame = ''
+  private keepaliveActive = false
+  private keepaliveGaveUp = false
+  private keepaliveFramesSent = 0
+  private streamOpenedAt = 0
+  private lastClientAudioAt: number | null = null
 
   constructor(callbacks: NovaSonicCallbacks = {}, options: NovaConnectionManagerOptions = {}) {
     this.externalCallbacks = callbacks
@@ -165,6 +232,12 @@ export class NovaConnectionManager {
       options.hardRenewMs ?? (Number(process.env.NOVA_RENEW_HARD_MS) || DEFAULT_RENEW_HARD_MS)
     this.minRenewalIntervalMs = options.minRenewalIntervalMs ?? DEFAULT_MIN_RENEWAL_INTERVAL_MS
     this.historyCapChars = options.historyCapChars ?? DEFAULT_HISTORY_CAP_CHARS
+    this.keepaliveEnabled = options.keepaliveEnabled ?? process.env.NOVA_KEEPALIVE_DISABLED !== '1'
+    this.keepaliveIdleMs = options.keepaliveIdleMs ?? envMs('NOVA_KEEPALIVE_IDLE_MS', DEFAULT_KEEPALIVE_IDLE_MS)
+    this.keepaliveTickMs = options.keepaliveTickMs ?? DEFAULT_KEEPALIVE_TICK_MS
+    this.keepaliveFrameMs = options.keepaliveFrameMs ?? DEFAULT_KEEPALIVE_FRAME_MS
+    this.keepaliveMaxIdleMs =
+      options.keepaliveMaxIdleMs ?? envMs('NOVA_KEEPALIVE_MAX_IDLE_MS', DEFAULT_KEEPALIVE_MAX_IDLE_MS)
   }
 
   // -------------------------------------------------------------------------
@@ -185,10 +258,17 @@ export class NovaConnectionManager {
     await session.start(instructions, tools, voiceId)
 
     this.connectionStartTime = Date.now()
+    this.streamOpenedAt = this.connectionStartTime
     this.scheduleTimers()
+    this.startKeepalive()
   }
 
   pushAudio(base64: string): void {
+    this.lastClientAudioAt = Date.now()
+    if (this.keepaliveActive) {
+      this.keepaliveActive = false
+      this.log(`keepalive stopped reason=client-audio framesSent=${this.keepaliveFramesSent}`)
+    }
     this.currentSession?.pushAudio(base64)
   }
 
@@ -205,6 +285,7 @@ export class NovaConnectionManager {
   async stop(): Promise<void> {
     this.stopped = true
     this.clearTimers()
+    this.stopKeepalive()
 
     const tasks: Array<Promise<void>> = []
     if (this.currentSession) tasks.push(this.currentSession.stop().catch(() => {}))
@@ -279,6 +360,55 @@ export class NovaConnectionManager {
     return !this.speaking && !this.toolCallOutstanding
   }
 
+  // -------------------------------------------------------------------------
+  // Silence keepalive — see the header comment. One manager-level interval
+  // (not per session) so it carries across renewals untouched: it always
+  // targets whichever session is current, and `lastClientAudioAt` is a
+  // property of the client, not of any one Bedrock stream.
+  // -------------------------------------------------------------------------
+
+  private startKeepalive(): void {
+    if (!this.keepaliveEnabled || this.stopped || this.keepaliveTimer) return
+    this.keepaliveFrame = silencePcmBase64(this.keepaliveFrameMs)
+    this.keepaliveTimer = setInterval(() => this.keepaliveTick(), this.keepaliveTickMs)
+    this.keepaliveTimer.unref?.()
+  }
+
+  private stopKeepalive(): void {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer)
+      this.keepaliveTimer = null
+    }
+    this.keepaliveActive = false
+  }
+
+  private keepaliveTick(): void {
+    if (this.stopped || !this.currentSession) return
+    const idleMs = Date.now() - (this.lastClientAudioAt ?? this.streamOpenedAt)
+    if (idleMs < this.keepaliveIdleMs) return
+
+    if (idleMs >= this.keepaliveMaxIdleMs) {
+      if (!this.keepaliveGaveUp) {
+        this.keepaliveGaveUp = true
+        this.keepaliveActive = false
+        this.log(
+          `keepalive gave-up idleMs=${idleMs} maxIdleMs=${this.keepaliveMaxIdleMs} framesSent=${this.keepaliveFramesSent} (no client audio; letting Nova time out)`,
+        )
+      }
+      return
+    }
+    this.keepaliveGaveUp = false
+
+    if (!this.keepaliveActive) {
+      this.keepaliveActive = true
+      this.log(
+        `keepalive started reason=${this.lastClientAudioAt === null ? 'no-client-audio-yet' : 'client-audio-gap'} idleMs=${idleMs}`,
+      )
+    }
+    this.keepaliveFramesSent++
+    this.currentSession.pushAudio(this.keepaliveFrame)
+  }
+
   /**
    * Shared by the onTurnEnd and onCompletionEnd callbacks (see
    * makeCallbacksFor): if a renewal is due and the connection is otherwise
@@ -313,21 +443,27 @@ export class NovaConnectionManager {
     const attemptStartedAt = Date.now()
     const historySnapshot = this.history.slice()
     const sanitizedHistory = sanitizeHistoryForNova(historySnapshot)
+    // Only a session in which the interviewer has already spoken is a
+    // "continuation"; otherwise the renewed stream must still open with the
+    // greeting kickoff, or nobody ever speaks first.
+    const assistantHasSpoken = this.assistantHasSpoken
     this.log(
-      `started reason=${reason} historyTurns=${historySnapshot.length} seeded=${sanitizedHistory.length}`,
+      `started reason=${reason} historyTurns=${historySnapshot.length} seeded=${sanitizedHistory.length} skipGreeting=${assistantHasSpoken}`,
     )
 
     const oldSession = this.currentSession
     const generation = ++this.sessionSeq
     this.pendingGeneration = generation
-    const renewedInstructions = `${this.instructions}\n${RENEWAL_NOTE}`
+    const renewedInstructions = assistantHasSpoken
+      ? `${this.instructions}\n${RENEWAL_NOTE}`
+      : this.instructions
     const newSession = this.sessionFactory(this.makeCallbacksFor(generation))
     this.pendingSession = newSession
 
     try {
       await newSession.start(renewedInstructions, this.tools, this.voiceId, {
         history: sanitizedHistory,
-        skipGreeting: true,
+        skipGreeting: assistantHasSpoken,
       })
     } catch (e) {
       this.renewing = false
@@ -353,6 +489,10 @@ export class NovaConnectionManager {
     this.pendingSession = null
     this.pendingGeneration = null
     this.connectionStartTime = Date.now()
+    // streamOpenedAt is deliberately NOT reset here: it anchors the keepalive
+    // idle clock for a client that has never sent audio, and resetting it on
+    // renewal would let an abandoned tab loop keepalive → timeout → reactive
+    // renewal → keepalive indefinitely instead of ending at the max-idle cap.
     this.speaking = false
     this.toolCallOutstanding = false
     this.renewing = false
@@ -385,6 +525,7 @@ export class NovaConnectionManager {
         if (upper === 'USER' || upper === 'ASSISTANT') {
           this.appendHistory(upper, content)
         }
+        if (upper === 'ASSISTANT') this.assistantHasSpoken = true
         this.externalCallbacks.onTextOutput?.(role, content)
         if (this.forceRenewalAtNextBoundary && !this.renewing) {
           this.forceRenewalAtNextBoundary = false
@@ -395,6 +536,7 @@ export class NovaConnectionManager {
       onAudioOutput: (base64) => {
         if (!isCurrent()) return
         this.speaking = true
+        this.assistantHasSpoken = true
         this.externalCallbacks.onAudioOutput?.(base64)
       },
 
