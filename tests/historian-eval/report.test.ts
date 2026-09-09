@@ -84,6 +84,7 @@ function thoroughnessEvaluation(overrides: Partial<ThoroughnessEvaluation> = {})
       phaseMarkers: { openingPresent: true, closingPresent: true },
       falseClosings: { count: 0, turnIndexes: [] },
       stackedQuestions: { count: 0, turns: [] },
+      narratedReasoning: { count: 0, turns: [] },
       turnCap: { patientTurnCount: 5, limit: 25, exceeded: false },
       structuredOutput: { valid: false, issues: ['structured_output is missing'] },
       criticalCoverage: [],
@@ -308,6 +309,7 @@ describe('buildHistorianEvalReport + formatHistorianEvalMarkdown', () => {
               phaseMarkers: { openingPresent: true, closingPresent: true },
               falseClosings: { count: 0, turnIndexes: [] },
               stackedQuestions: { count: 0, turns: [] },
+              narratedReasoning: { count: 0, turns: [] },
               turnCap: { patientTurnCount: 5, limit: 25, exceeded: false },
               structuredOutput: { valid: false, issues: [] },
               criticalCoverage: [],
@@ -400,6 +402,38 @@ describe('buildHistorianEvalReport + formatHistorianEvalMarkdown', () => {
     it('is null (not zero) when no case produced a thoroughness result', () => {
       const aggregates = aggregateHistorianEvalCases([makeCase({ thoroughness: failedRun('boom') })])
       expect(aggregates.thoroughnessOverall).toBeNull()
+    })
+  })
+
+  describe('deterministicNarratedReasoningCount', () => {
+    it('sums narrated-reasoning turns across cases and renders in the markdown', () => {
+      const narrated = (n: number) =>
+        thoroughnessEvaluation({
+          deterministic: {
+            diagnosisLeak: { leaked: false, matches: [] },
+            phaseMarkers: { openingPresent: true, closingPresent: true },
+            falseClosings: { count: 0, turnIndexes: [] },
+            stackedQuestions: { count: 0, turns: [] },
+            narratedReasoning: { count: n, turns: [] },
+            turnCap: { patientTurnCount: 5, limit: 25, exceeded: false },
+            structuredOutput: { valid: true, issues: [] },
+            criticalCoverage: [],
+            issues: [],
+          },
+        })
+      const report = buildHistorianEvalReport({
+        mode: 'fixtures',
+        live: true,
+        cases: [
+          makeCase({ caseId: 'a', thoroughness: run({ result: narrated(2) }) }),
+          makeCase({ caseId: 'b', thoroughness: run({ result: narrated(1) }) }),
+        ],
+        gateSet: GATE_SET,
+        generatedAt: '2026-07-21T00:00:00.000Z',
+      })
+      expect(report.aggregates.deterministicNarratedReasoningCount).toBe(3)
+      const md = formatHistorianEvalMarkdown(report)
+      expect(md).toContain('Deterministic narrated-reasoning count (summed, spoken planning): 3')
     })
   })
 

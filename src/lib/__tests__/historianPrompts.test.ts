@@ -23,11 +23,11 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toMatch(/HOW TO START A TURN/)
     expect(prompt).toMatch(/one place to thank the patient/)
     expect(prompt).toMatch(/FOLLOW THE THREAD/)
-    expect(prompt).toMatch(/EVERY TURN — CHECK BEFORE YOU SPEAK/)
-    const checklistIndex = prompt.indexOf('EVERY TURN — CHECK BEFORE YOU SPEAK')
+    expect(prompt).toMatch(/EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK/)
+    const checklistIndex = prompt.indexOf('EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK')
     expect(checklistIndex).toBeGreaterThan(prompt.indexOf('REFERRAL REASON:'))
     expect(checklistIndex).toBeGreaterThan(prompt.indexOf('REFERRAL-DIRECTED PRIORITY:'))
-    expect(prompt.slice(checklistIndex)).toBe(`EVERY TURN — CHECK BEFORE YOU SPEAK:
+    expect(prompt.slice(checklistIndex)).toBe(`EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK (this checklist is private — never say any of it aloud):
 1. Exactly one thing for the patient to answer.
 2. No thanks, no praise, no restating in any question turn — start with the question or a short topic bridge. The single closing message after save_interview_output is the one place to thank the patient.
 3. Plain words; at most one sentence before the question.
@@ -59,6 +59,12 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('988')
     expect(prompt).toContain('741741')
     expect(prompt).toContain('911')
+  })
+
+  it('includes the SPOKEN OUTPUT ONLY rule (never narrate reasoning aloud)', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient')
+    expect(prompt).toContain('SPOKEN OUTPUT ONLY')
+    expect(prompt).toContain('never say any of it aloud')
   })
 
   it('includes the phased interview structure (Phase 1 turns 1-3, Phase 2 turns 4+)', () => {
@@ -232,7 +238,7 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('symptom_onset')
     expect(prompt).toContain('patient-reported and unverified')
     expect(prompt).toContain('Never diagnose, score urgency, clear an emergency')
-    expect(prompt).not.toContain('EVERY TURN — CHECK BEFORE YOU SPEAK')
+    expect(prompt).not.toContain('EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK')
     expect(prompt).not.toContain('6. If medications')
     expect(prompt).not.toContain('Phase 1')
     expect(prompt).not.toContain('scale_step')

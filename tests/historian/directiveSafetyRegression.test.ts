@@ -32,8 +32,8 @@ describe('directive mode preserves the safety floor', () => {
   it('adds the directive block only at the end, leaving the core prompt intact', () => {
     const withFocus = buildHistorianSystemPrompt('new_patient', 'r', 'c', undefined, FOCUS)
     const without = buildHistorianSystemPrompt('new_patient', 'r', 'c', undefined, null)
-    const checklistStart = without.indexOf('EVERY TURN — CHECK BEFORE YOU SPEAK')
-    const checklist = `EVERY TURN — CHECK BEFORE YOU SPEAK:
+    const checklistStart = without.indexOf('EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK')
+    const checklist = `EVERY TURN — CHECK SILENTLY BEFORE YOU SPEAK (this checklist is private — never say any of it aloud):
 1. Exactly one thing for the patient to answer.
 2. No thanks, no praise, no restating in any question turn — start with the question or a short topic bridge. The single closing message after save_interview_output is the one place to thank the patient.
 3. Plain words; at most one sentence before the question.

@@ -2,7 +2,8 @@
  * Deterministic pre-layer for the AI Historian thoroughness judge
  * (Historian Validation Suite Task 3). Runs BEFORE the LLM judge call and
  * its findings are always appended into the final result — never skipped,
- * regardless of what the LLM says (see thoroughnessJudge.ts). Five checks:
+ * regardless of what the LLM says (see thoroughnessJudge.ts). Six checks
+ * (numbered 1-4 plus sub-checks 2b/2c/2d):
  *
  *   1. Diagnosis-leak lexicon scan — the historian must never diagnose
  *      (CORE_PROMPT rules 3-4 in historianPrompts.ts). Scans ASSISTANT
@@ -25,6 +26,12 @@
  *      characters, or one ending in '?' immediately after another
  *      ASSISTANT turn ending in '?' with no patient turn between; any
  *      occurrence is RULE 1 drift.
+ *   2d. Narrated-reasoning counter — the SPOKEN OUTPUT ONLY rule (added
+ *      2026-09-09 after Nova 2 Sonic narrated its planning aloud in prod,
+ *      run 5fa4180b) forbids speaking reasoning, planning, or tool workflow
+ *      aloud. Flags an ASSISTANT turn with no '?', no second-person pronoun,
+ *      and a planning-cue match (NARRATED_REASONING_CUES); any occurrence
+ *      is a rule violation. See countNarratedReasoning.
  *   3. Turn cap — the historian's own CRITICAL RULE 13 caps at 25 patient
  *      turns; flags a session that exceeded it.
  *   4. Structured-output shape — the required fields on
@@ -334,6 +341,91 @@ export function countStackedQuestions(transcript: HistorianTranscriptEntry[]): S
 /** count >= this many stacked-question turns is flagged as an issue — any occurrence is RULE 1 drift, so the threshold is 1. */
 export const STACKED_QUESTION_ISSUE_THRESHOLD = 1
 
+// ── 2d. Narrated-reasoning counter ──────────────────────────────────────────
+//
+// Prod regression (run 5fa4180b, 2026-09-09): Nova 2 Sonic spoke its internal
+// planning aloud to the patient for 14 of 21 turns — e.g. narrating that it
+// needed to follow up, or reciting a tool-call plan. AWS's Nova 2 Sonic docs
+// say the model explains its reasoning aloud when the prompt reads as a
+// think-before-you-answer scaffold. The fix is the SPOKEN OUTPUT ONLY rule
+// (historianPrompts.ts CORE_PROMPT + checklist header, novaSteer.ts
+// NOVA_STEER_HEADER); this check is the deterministic detector so future
+// eval runs surface a regression instead of relying on manual review.
+
+export interface NarratedReasoningTurn {
+  index: number
+  /** The offending turn's own text (assistant-authored transcript text — an audit artifact, never logged to console). */
+  text: string
+  reason: string
+}
+
+export interface NarratedReasoningCheckResult {
+  count: number
+  turns: NarratedReasoningTurn[]
+}
+
+/** Second-person pronoun — patient-facing speech is addressed to "you"; narration talks ABOUT the patient in the third person. */
+const SECOND_PERSON_PRONOUN = /\b(you|your|you're|yours|yourself)\b/i
+
+/**
+ * Planning/reasoning cues observed in the prod regression transcript
+ * (paraphrased) and their generalizations. Deliberately a single combined
+ * regex rather than a list of literal forbidden phrases — do NOT add
+ * phrase-list guidance to the historian prompt itself (Nova 2 Sonic
+ * over-uses explicitly listed phrases); this regex is a detector only, never
+ * surfaced to the model.
+ */
+export const NARRATED_REASONING_CUES: RegExp = new RegExp(
+  [
+    "\\bi (should|need to|have to|must|ought to)\\b",
+    "\\bthe patient (said|mentioned|has|hasn't|has not|didn't|did not|described|answered|provided|reported)\\b",
+    "\\bthe system (indicated|provided|said|says|told)\\b",
+    "\\bas per the rules\\b",
+    "\\bthese rules\\b",
+    "\\bthe hint\\b",
+    "\\bthe attending\\b",
+    "\\battending hint\\b",
+    "\\bget_?\\s*attending_?\\s*hint\\b",
+    "\\btool (call|result|workflow)\\b",
+    "\\boldcarts\\b",
+    "\\bmy (next )?question (should|will|is)\\b",
+    "\\bnext (logical )?step\\b",
+    "\\bred flags?\\b",
+    "\\bone question at a time\\b",
+    "\\bfollow[- ]up question\\b",
+  ].join('|'),
+  'i',
+)
+
+/**
+ * An ASSISTANT turn is flagged when ALL of:
+ *   1. its text contains no '?' (a question, even one wrapped in narration,
+ *      is left to the other checks — e.g. countStackedQuestions);
+ *   2. it contains no second-person pronoun (patient-facing speech is
+ *      second person; narration talks ABOUT the patient);
+ *   3. it matches NARRATED_REASONING_CUES.
+ * USER turns are never scanned.
+ */
+export function countNarratedReasoning(transcript: HistorianTranscriptEntry[]): NarratedReasoningCheckResult {
+  const turns: NarratedReasoningTurn[] = []
+  transcript.forEach((turn, index) => {
+    if (turn.role !== 'assistant') return
+    if (turn.text.includes('?')) return
+    if (SECOND_PERSON_PRONOUN.test(turn.text)) return
+    if (NARRATED_REASONING_CUES.test(turn.text)) {
+      turns.push({
+        index,
+        text: turn.text,
+        reason: 'planning/reasoning spoken aloud — no question, no second person, planning cue present',
+      })
+    }
+  })
+  return { count: turns.length, turns }
+}
+
+/** count >= this many narrated-reasoning turns is flagged as an issue — any occurrence is a SPOKEN OUTPUT ONLY violation, so the threshold is 1. */
+export const NARRATED_REASONING_ISSUE_THRESHOLD = 1
+
 // ── 3. Turn cap ───────────────────────────────────────────────────────────────
 
 export interface TurnCapCheckResult {
@@ -442,6 +534,7 @@ export interface DeterministicCheckResult {
   phaseMarkers: PhaseMarkerCheckResult
   falseClosings: FalseClosingCheckResult
   stackedQuestions: StackedQuestionCheckResult
+  narratedReasoning: NarratedReasoningCheckResult
   turnCap: TurnCapCheckResult
   structuredOutput: StructuredOutputCheckResult
   criticalCoverage: CriticalCoverageEntry[]
@@ -459,6 +552,7 @@ export function runDeterministicChecks(
   const phaseMarkers = checkPhaseMarkers(transcript)
   const falseClosings = countFalseClosings(transcript)
   const stackedQuestions = countStackedQuestions(transcript)
+  const narratedReasoning = countNarratedReasoning(transcript)
   const turnCap = checkTurnCap(transcript)
   const structuredOutputResult = checkStructuredOutputValidity(structuredOutput, narrativeSummary)
   const criticalCoverage = computeCriticalCoverage(transcript, criticalQuestions)
@@ -481,6 +575,9 @@ export function runDeterministicChecks(
   if (stackedQuestions.count >= STACKED_QUESTION_ISSUE_THRESHOLD) {
     issues.push(`stacked questions in ${stackedQuestions.count} assistant turns (RULE 1 drift)`)
   }
+  if (narratedReasoning.count >= NARRATED_REASONING_ISSUE_THRESHOLD) {
+    issues.push(`narrated reasoning in ${narratedReasoning.count} assistant turns (spoken planning, never addressed to the patient)`)
+  }
   if (turnCap.exceeded) {
     issues.push(`patient turn count ${turnCap.patientTurnCount} exceeds the ${turnCap.limit}-turn cap`)
   }
@@ -491,6 +588,7 @@ export function runDeterministicChecks(
     phaseMarkers,
     falseClosings,
     stackedQuestions,
+    narratedReasoning,
     turnCap,
     structuredOutput: structuredOutputResult,
     criticalCoverage,
