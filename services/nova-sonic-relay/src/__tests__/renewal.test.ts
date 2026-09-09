@@ -391,3 +391,79 @@ describe('sanitizeHistoryForNova', () => {
     ])
   })
 })
+
+// ---------------------------------------------------------------------------
+// Production trace 2026-09-08 (historian_sessions row 4517ec57, 0 turns,
+// 110s): a reactive renewal fired at 55s with historyTurns=0 seeded=0 and
+// skipGreeting=true — so even if the renewed stream had lived, Henry would
+// never have greeted. These tests pin (a) greet-on-renewal when the
+// assistant has not spoken yet and (b) the 60s rate limit staying in force
+// for a second reactive error (a renewal into another audio-less stream
+// would just die the same way; the fix for that failure is the silence
+// keepalive in keepalive.test.ts, not a rate-limit bypass).
+// ---------------------------------------------------------------------------
+
+describe('NovaConnectionManager reactive renewal before the assistant has spoken', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  it('a reactive renewal with NO assistant turn in history does not skip the greeting and does not append the renewal note', async () => {
+    const { factory, sessions } = makeFactory()
+    const manager = new NovaConnectionManager(
+      {},
+      { sessionFactory: factory, renewAfterMs: 10_000_000, hardRenewMs: 10_000_000, minRenewalIntervalMs: 0, keepaliveEnabled: false },
+    )
+    await manager.start('be a historian', [], 'matthew')
+
+    sessions[0].callbacks.onError?.(new Error('Timed out waiting for audio bytes or interactive content.'))
+    await flush()
+
+    expect(sessions).toHaveLength(2)
+    const call = sessions[1].startCalls[0]
+    expect(call.options?.skipGreeting).toBe(false)
+    expect(call.options?.history).toEqual([])
+    expect(call.instructions).toBe('be a historian')
+  })
+
+  it('a renewal after the assistant HAS spoken still skips the greeting and appends the renewal note', async () => {
+    const { factory, sessions } = makeFactory()
+    const manager = new NovaConnectionManager(
+      {},
+      { sessionFactory: factory, renewAfterMs: 10_000_000, hardRenewMs: 10_000_000, minRenewalIntervalMs: 0, keepaliveEnabled: false },
+    )
+    await manager.start('be a historian', [], 'matthew')
+    sessions[0].callbacks.onTextOutput?.('ASSISTANT', 'Hello, what brings you in today?')
+
+    sessions[0].callbacks.onError?.(new Error('boom'))
+    await flush()
+
+    expect(sessions).toHaveLength(2)
+    const call = sessions[1].startCalls[0]
+    expect(call.options?.skipGreeting).toBe(true)
+    expect(call.instructions).toContain('Connection renewed mid-interview')
+  })
+
+  it('a second reactive error inside minRenewalIntervalMs is NOT renewed again — it is forwarded to onError (the existing close(1011) trigger)', async () => {
+    const { factory, sessions } = makeFactory()
+    const onError = vi.fn()
+    const manager = new NovaConnectionManager(
+      { onError },
+      { sessionFactory: factory, renewAfterMs: 10_000_000, hardRenewMs: 10_000_000, minRenewalIntervalMs: 60_000, keepaliveEnabled: false },
+    )
+    await manager.start('be a historian', [], 'matthew')
+
+    sessions[0].callbacks.onError?.(new Error('first timeout'))
+    await flush()
+    expect(sessions).toHaveLength(2)
+    expect(onError).not.toHaveBeenCalled()
+
+    const second = new Error('second timeout')
+    sessions[1].callbacks.onError?.(second)
+    await flush()
+    expect(sessions).toHaveLength(2)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(second)
+  })
+})
