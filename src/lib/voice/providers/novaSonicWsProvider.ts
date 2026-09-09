@@ -13,6 +13,27 @@
  *
  * It owns NO harness logic — tool calls are surfaced as `toolCall` VoiceEvents
  * and results come back in via `sendToolResult`.
+ *
+ * Nova's turn ordering — text BEFORE audio — and why stop() waits:
+ *   Unlike OpenAI's Realtime API, where a turn's transcript arrives after its
+ *   audio, Nova Sonic streams the `assistantTranscript` ServerMsg BEFORE the
+ *   `audio` chunks it describes. `useRealtimeSession`'s assistantTranscript
+ *   handler treats that event as "the AI finished speaking" (correct for
+ *   OpenAI) and calls setAiSpeaking(false) + maybeScheduleAutoEnd(), so on
+ *   Nova the session's endSession()/stop() can run while Nova is still
+ *   *generating* the current turn's audio — not merely finishing playback of
+ *   audio already received (that part #238's drain wait already covers).
+ *   Sending `{t:'stop'}` to the relay at that point has it close the Nova
+ *   stream mid-generation, permanently losing the rest of the turn (prod, run
+ *   66843ad4, 2026-09-09: the patient heard Henry's closing line except the
+ *   last word or two). stop() below therefore waits for the turn itself to
+ *   finish — a `completion`/`aiSpeechStop` message, or TURN_IDLE_MS of no new
+ *   `audio`, or the STOP_TURN_CAP_MS hard cap — before sending `{t:'stop'}`,
+ *   in addition to (not instead of) #238's post-stop drain wait for audio
+ *   that has already reached the browser. The ordering bug itself is NOT
+ *   fixed here — that logic is shared with the OpenAI provider and has its
+ *   own regression history (see useRealtimeSession's "Fix 2/3/4" comments) —
+ *   this provider instead makes stop() robust to being called early.
  */
 
 import type { ClientMsg, ServerMsg } from '@/lib/voice/relayProtocol'
@@ -27,6 +48,21 @@ import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/p
  */
 const STOP_DRAIN_CAP_MS = 8000
 
+/**
+ * How long stop() will wait, with no new `audio` ServerMsg arriving, before
+ * concluding Nova's current turn has actually finished producing audio (as
+ * opposed to merely pausing between chunks). See stop() below.
+ */
+const TURN_IDLE_MS = 800
+
+/**
+ * Absolute cap on how long stop() will wait for Nova's in-flight turn to
+ * finish before giving up and sending `{t:'stop'}` anyway. Guards against a
+ * turn that never emits `completion`/`aiSpeechStop` and never goes idle
+ * (e.g. a stuck relay) stalling teardown indefinitely.
+ */
+const STOP_TURN_CAP_MS = 6000
+
 export class NovaSonicWsProvider implements VoiceProvider {
   private ws: WebSocket | null = null
   private mic: MicCapture | null = null
@@ -40,6 +76,13 @@ export class NovaSonicWsProvider implements VoiceProvider {
    *  stop() — so getAudioDiagnostics() still has something to return after
    *  teardown (e.g. when the hook reads it right after stop() completes). */
   private stashedDiagnostics: Record<string, unknown> | null = null
+  /** Timestamp (Date.now()) of the most recent relay `audio` ServerMsg, or 0
+   *  if none has arrived yet. Drives stop()'s turn-idle wait below. */
+  private lastAudioAt = 0
+  /** Pending resolvers for stop()'s "let the turn finish" wait — released by
+   *  the next `completion` or `aiSpeechStop` relay message. Normally empty;
+   *  only populated while stop() is waiting. */
+  private turnFinishResolvers: Array<() => void> = []
 
   on(cb: (e: VoiceEvent) => void): void {
     this.cb = cb
@@ -174,7 +217,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
         this.emit({ type: 'assistantTextDelta', text: msg.text })
         break
       case 'audio':
-        // Raw audio drives the player only — no VoiceEvent.
+        // Raw audio drives the player only — no VoiceEvent. Recorded even
+        // while stop() is waiting (closing=true does NOT gate this handler)
+        // so stop()'s turn-idle wait can tell an active turn from a stalled
+        // one, and so the audio itself keeps reaching the player.
+        this.lastAudioAt = Date.now()
         this.player?.enqueue(msg.pcm)
         break
       case 'aiSpeechStart':
@@ -192,6 +239,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // immediately once nothing is left scheduled.
         this.aiSpeaking = false
         this.emitAiSpeechStopWhenDrained()
+        this.resolveTurnWait()
         break
       case 'bargeIn':
         // User interrupted: flush queued AI audio, then signal speech stopped
@@ -222,6 +270,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // auto-end gates on interviewCompleted, so it can't end early).
         this.aiSpeaking = false
         this.emitAiSpeechStopWhenDrained()
+        this.resolveTurnWait()
         break
       case 'error':
         this.emit({ type: 'error', message: msg.message })
@@ -245,6 +294,65 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
     player.whenDrained().then(() => {
       this.emit({ type: 'aiSpeechStop' })
+    })
+  }
+
+  /** Releases stop()'s "let the turn finish" wait, if one is pending. */
+  private resolveTurnWait(): void {
+    const resolvers = this.turnFinishResolvers
+    this.turnFinishResolvers = []
+    for (const resolve of resolvers) resolve()
+  }
+
+  /**
+   * True when there's clearly nothing to wait for: no turn is in progress
+   * (aiSpeaking is false) AND no `audio` ServerMsg has arrived in the last
+   * TURN_IDLE_MS (or ever). Lets stop() skip the wait entirely on the
+   * transport-drop / manual-end path, where there is no in-flight goodbye.
+   */
+  private shouldSkipTurnWait(): boolean {
+    const sinceLastAudio = this.lastAudioAt === 0 ? Infinity : Date.now() - this.lastAudioAt
+    return !this.aiSpeaking && sinceLastAudio >= TURN_IDLE_MS
+  }
+
+  /**
+   * Resolves on the FIRST of: a `completion`/`aiSpeechStop` relay message
+   * (via resolveTurnWait, called from handleServerMsg), TURN_IDLE_MS
+   * elapsing with no new `audio` message, or the STOP_TURN_CAP_MS hard cap.
+   * Never rejects.
+   */
+  private waitForTurnToFinish(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let settled = false
+      let idleTimer: ReturnType<typeof setTimeout> | undefined
+
+      const finish = () => {
+        if (settled) return
+        settled = true
+        if (idleTimer !== undefined) clearTimeout(idleTimer)
+        clearTimeout(capTimer)
+        const idx = this.turnFinishResolvers.indexOf(finish)
+        if (idx >= 0) this.turnFinishResolvers.splice(idx, 1)
+        resolve()
+      }
+
+      this.turnFinishResolvers.push(finish)
+      const capTimer = setTimeout(finish, STOP_TURN_CAP_MS)
+
+      // Re-checked (not just scheduled once) each time it fires: a new
+      // `audio` message pushes lastAudioAt forward between now and when
+      // this timer was set, so the first firing may find time still
+      // remaining — in which case it reschedules for the new remainder
+      // rather than firing early.
+      const scheduleIdleCheck = () => {
+        const remaining = TURN_IDLE_MS - (Date.now() - this.lastAudioAt)
+        if (remaining <= 0) {
+          finish()
+          return
+        }
+        idleTimer = setTimeout(scheduleIdleCheck, remaining)
+      }
+      scheduleIdleCheck()
     })
   }
 
@@ -287,11 +395,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   async stop(): Promise<void> {
     if (this.closing) return // idempotent
     this.closing = true
-    this.aiSpeaking = false
 
-    // Tell the relay we're done before tearing local resources down.
-    this.send({ t: 'stop' })
-
+    // Stop the mic immediately — the patient should not be recorded once
+    // stop() has been called, even while we wait below for Nova's in-flight
+    // turn to actually finish.
     if (this.mic) {
       try {
         await this.mic.stop()
@@ -300,6 +407,26 @@ export class NovaSonicWsProvider implements VoiceProvider {
       }
       this.mic = null
     }
+
+    // Let the current AI turn finish before telling the relay to stop. Nova
+    // sends the turn's transcript text (assistantTranscript) BEFORE its
+    // audio, unlike OpenAI where the transcript arrives after the audio —
+    // see the class header comment. The hook's setAiSpeaking(false) +
+    // maybeScheduleAutoEnd() therefore fire while Nova is still generating
+    // (and streaming) the goodbye, so by the time stop() runs here the turn
+    // may still be in flight. Sending `{t:'stop'}` immediately in that case
+    // has the relay close Nova mid-generation, cutting the closing line off
+    // (prod, run 66843ad4, 2026-09-09) — #238's drain wait only helps audio
+    // that already reached the browser. Skipped entirely on the transport-
+    // drop / manual-end path where there is no in-flight turn to protect —
+    // see shouldSkipTurnWait().
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.shouldSkipTurnWait()) {
+      await this.waitForTurnToFinish()
+    }
+    this.aiSpeaking = false
+
+    // Tell the relay we're done before tearing local resources down.
+    this.send({ t: 'stop' })
 
     if (this.player) {
       // Let any already-queued audio (e.g. a closing goodbye) actually play
