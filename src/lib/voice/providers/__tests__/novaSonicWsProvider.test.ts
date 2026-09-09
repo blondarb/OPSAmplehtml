@@ -27,9 +27,10 @@ const playerWhenDrained = vi.fn(() => {
   })
 })
 const playerClose = vi.fn(async () => {})
+const playerEnqueue = vi.fn()
 vi.mock('@/lib/voice/audio/player', () => ({
   PcmPlayer: class {
-    enqueue = vi.fn()
+    enqueue = playerEnqueue
     interrupt = vi.fn()
     close = playerClose
     whenDrained = playerWhenDrained
@@ -203,6 +204,7 @@ describe('NovaSonicWsProvider — stop() waits for the player to drain', () => {
     micStop.mockClear()
     playerWhenDrained.mockClear()
     playerClose.mockClear()
+    playerEnqueue.mockClear()
     whenDrainedMode = 'immediate'
     whenDrainedResolvers = []
     vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -269,5 +271,178 @@ describe('NovaSonicWsProvider — stop() waits for the player to drain', () => {
     await stopPromise
 
     expect(playerClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// stop() letting Nova's in-flight turn finish before sending {t:'stop'}.
+//
+// Prod context (run 66843ad4, 2026-09-09, AFTER #238 was live): the patient
+// heard Henry's closing line except the last word or two. Cause: Nova sends
+// the turn's transcript text BEFORE its audio (unlike OpenAI), so
+// useRealtimeSession's assistantTranscript handler calls setAiSpeaking(false)
+// + maybeScheduleAutoEnd() while Nova is still GENERATING the goodbye —
+// #238's drain wait can only play audio that already reached the browser, so
+// sending {t:'stop'} immediately has the relay close Nova mid-generation and
+// the tail is lost forever. stop() must now wait for the turn itself
+// (completion/aiSpeechStop, or a run of idle time, or a hard cap) before
+// telling the relay to stop.
+// ---------------------------------------------------------------------------
+
+describe('NovaSonicWsProvider — stop() waits for the AI turn to finish before sending {t:"stop"}', () => {
+  beforeEach(() => {
+    instances = []
+    micStart.mockClear()
+    micStop.mockClear()
+    playerWhenDrained.mockClear()
+    playerClose.mockClear()
+    playerEnqueue.mockClear()
+    whenDrainedMode = 'immediate'
+    whenDrainedResolvers = []
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  /** True if any frame sent on `ws` so far is the relay `{t:'stop'}` ClientMsg. */
+  function stopFrameSent(ws: FakeWebSocket): boolean {
+    return ws.sent.some((raw) => (JSON.parse(raw) as { t: string }).t === 'stop')
+  }
+
+  function relayMsg(ws: FakeWebSocket, msg: Record<string, unknown>): void {
+    ws.onmessage?.({ data: JSON.stringify(msg) } as MessageEvent)
+  }
+
+  async function startProvider(): Promise<{ provider: InstanceType<typeof NovaSonicWsProvider>; ws: FakeWebSocket }> {
+    const provider = new NovaSonicWsProvider()
+    provider.on(() => {})
+    await provider.start({
+      relayUrl: 'wss://relay.example/nova',
+      relayToken: 'tok',
+      instructions: 'be a historian',
+      tools: [],
+    })
+    const ws = instances[0]
+    ws.onopen?.()
+    return { provider, ws }
+  }
+
+  it('holds the stop frame while audio keeps arriving every 200ms, and still enqueues that audio to the player', async () => {
+    vi.useFakeTimers()
+    const { provider, ws } = await startProvider()
+
+    relayMsg(ws, { t: 'aiSpeechStart' })
+    relayMsg(ws, { t: 'audio', pcm: 'seed' }) // establishes an in-flight turn
+
+    const stopPromise = provider.stop()
+    await vi.advanceTimersByTimeAsync(0) // flush the mic.stop() microtask chain
+
+    expect(stopFrameSent(ws)).toBe(false)
+
+    // Keep audio arriving every 200ms (< TURN_IDLE_MS) for four chunks —
+    // the stop frame must not be sent as long as audio keeps coming in.
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(200)
+      relayMsg(ws, { t: 'audio', pcm: `during-wait-${i}` })
+      expect(stopFrameSent(ws)).toBe(false)
+    }
+    expect(playerEnqueue).toHaveBeenCalledWith('during-wait-0')
+    expect(playerEnqueue).toHaveBeenCalledWith('during-wait-3')
+
+    // No further audio — the idle timer should now fire TURN_IDLE_MS (800ms)
+    // after that last chunk and release the stop frame.
+    await vi.advanceTimersByTimeAsync(799)
+    expect(stopFrameSent(ws)).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(stopFrameSent(ws)).toBe(true)
+
+    await stopPromise
+  })
+
+  it('releases the wait immediately when a completion message arrives, sending the stop frame right after', async () => {
+    vi.useFakeTimers()
+    const { provider, ws } = await startProvider()
+
+    relayMsg(ws, { t: 'aiSpeechStart' })
+    relayMsg(ws, { t: 'audio', pcm: 'seed' })
+
+    const stopPromise = provider.stop()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(stopFrameSent(ws)).toBe(false)
+
+    relayMsg(ws, { t: 'completion' })
+    await vi.advanceTimersByTimeAsync(0) // let the released wait's continuation run
+
+    expect(stopFrameSent(ws)).toBe(true)
+
+    await stopPromise
+  })
+
+  it('releases the wait immediately when an aiSpeechStop message arrives, sending the stop frame right after', async () => {
+    vi.useFakeTimers()
+    const { provider, ws } = await startProvider()
+
+    relayMsg(ws, { t: 'aiSpeechStart' })
+    relayMsg(ws, { t: 'audio', pcm: 'seed' })
+
+    const stopPromise = provider.stop()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(stopFrameSent(ws)).toBe(false)
+
+    relayMsg(ws, { t: 'aiSpeechStop' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(stopFrameSent(ws)).toBe(true)
+
+    await stopPromise
+  })
+
+  it('gives up and sends the stop frame at STOP_TURN_CAP_MS when audio keeps arriving continuously', async () => {
+    vi.useFakeTimers()
+    const { provider, ws } = await startProvider()
+
+    relayMsg(ws, { t: 'aiSpeechStart' })
+    relayMsg(ws, { t: 'audio', pcm: 'seed' })
+
+    const stopPromise = provider.stop()
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Re-feed audio every 300ms (well under the 800ms idle threshold) so the
+    // idle path never fires, right up to just under the 6s hard cap.
+    let elapsed = 0
+    while (elapsed < 5700) {
+      await vi.advanceTimersByTimeAsync(300)
+      relayMsg(ws, { t: 'audio', pcm: 'x' })
+      elapsed += 300
+    }
+    expect(stopFrameSent(ws)).toBe(false)
+
+    // Cross the STOP_TURN_CAP_MS (6000ms) cap.
+    await vi.advanceTimersByTimeAsync(400)
+    await stopPromise
+
+    expect(stopFrameSent(ws)).toBe(true)
+  })
+
+  it('sends the stop frame immediately when there is no recent audio and aiSpeaking is false (transport-drop / manual-end path)', async () => {
+    const { provider, ws } = await startProvider()
+    // No aiSpeechStart, no audio — nothing in flight.
+
+    const stopPromise = provider.stop()
+
+    // Flush stop()'s pre-wait microtask chain (await mic.stop(), the
+    // synchronous skip check) with no timers involved.
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(stopFrameSent(ws)).toBe(true)
+
+    await stopPromise
   })
 })
