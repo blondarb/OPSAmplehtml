@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { countStackedQuestions, STACKED_QUESTION_ISSUE_THRESHOLD, runDeterministicChecks } from '../deterministicChecks'
+import {
+  countStackedQuestions,
+  STACKED_QUESTION_ISSUE_THRESHOLD,
+  countNarratedReasoning,
+  NARRATED_REASONING_ISSUE_THRESHOLD,
+  runDeterministicChecks,
+} from '../deterministicChecks'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 // Synthetic transcript text only — no PHI. Mirrors the shape reported from a
@@ -87,5 +93,86 @@ describe('runDeterministicChecks — stacked question wiring', () => {
     const result = runDeterministicChecks(transcript, null, null, [])
     expect(result.stackedQuestions.count).toBe(0)
     expect(result.issues.some((issue) => issue.includes('stacked questions'))).toBe(false)
+  })
+})
+
+// Synthetic transcript text only — no PHI, paraphrased from the prod
+// regression (run 5fa4180b, 2026-09-09) where Nova 2 Sonic narrated its
+// planning aloud to the patient.
+
+describe('countNarratedReasoning', () => {
+  it('flags a narration turn with no question mark, no second person, and a planning cue', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', "Okay, the patient mentioned some weakness in one arm. I need to follow up on this."),
+      turn('assistant', 'First, I should call get_attending_hint again as per the rules.'),
+      turn('assistant', 'The next logical step is to ask about where the weakness is.'),
+    ]
+    const result = countNarratedReasoning(transcript)
+    expect(result.count).toBe(3)
+    expect(result.turns.map((t) => t.index)).toEqual([0, 1, 2])
+  })
+
+  it('does not flag a patient-facing bridge with no question mark', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', "Let's talk about your medications."),
+      turn('assistant', "I'm sorry — that sounds really hard."),
+      turn('assistant', "Okay, let's move on to medications."),
+    ]
+    const result = countNarratedReasoning(transcript)
+    expect(result.count).toBe(0)
+  })
+
+  it('does not flag a narration-shaped turn that still contains a question mark', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', 'So my question should be: where do you feel this weakness?'),
+    ]
+    const result = countNarratedReasoning(transcript)
+    expect(result.count).toBe(0)
+  })
+
+  it('does not flag a second-person line containing a cue word', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', 'I need to ask you about any red flags your doctor mentioned.'),
+    ]
+    const result = countNarratedReasoning(transcript)
+    expect(result.count).toBe(0)
+  })
+
+  it('does not flag user turns even when they match cues', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('user', 'I should probably mention the patient history from my last doctor as per the rules.'),
+    ]
+    const result = countNarratedReasoning(transcript)
+    expect(result.count).toBe(0)
+  })
+})
+
+describe('NARRATED_REASONING_ISSUE_THRESHOLD', () => {
+  it('is 1 — any narrated-reasoning turn is worth flagging', () => {
+    expect(NARRATED_REASONING_ISSUE_THRESHOLD).toBe(1)
+  })
+})
+
+describe('runDeterministicChecks — narrated reasoning wiring', () => {
+  it('includes narratedReasoning in the result and pushes an issue when count >= threshold', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', 'Good morning, thanks for making time to talk with me today.'),
+      turn('user', 'Sure.'),
+      turn('assistant', 'The next logical step is to ask about where the weakness is.'),
+      turn('user', 'Okay.'),
+    ]
+    const result = runDeterministicChecks(transcript, null, null, [])
+    expect(result.narratedReasoning.count).toBe(1)
+    expect(result.issues).toContain('narrated reasoning in 1 assistant turns (spoken planning, never addressed to the patient)')
+  })
+
+  it('does not push a narrated-reasoning issue when count is 0', () => {
+    const transcript: HistorianTranscriptEntry[] = [
+      turn('assistant', 'When did the headaches start?'),
+      turn('user', 'About three weeks ago.'),
+    ]
+    const result = runDeterministicChecks(transcript, null, null, [])
+    expect(result.narratedReasoning.count).toBe(0)
+    expect(result.issues.some((issue) => issue.includes('narrated reasoning'))).toBe(false)
   })
 })

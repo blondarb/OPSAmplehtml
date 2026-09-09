@@ -50,6 +50,7 @@ describe('the Nova steer tool and workflow', () => {
     expect(NOVA_STEER_HEADER).toContain('never say you are checking anything')
     expect(NOVA_STEER_HEADER).toContain('Never mention the hint, the tool, or an attending')
     expect(NOVA_STEER_HEADER).toContain('SAFETY RESPONSE script always take precedence')
+    expect(NOVA_STEER_HEADER).toContain('All of this is private')
     expect(NOVA_STEER_CHECKLIST_ITEM).toMatch(/^7\. /)
   })
 
