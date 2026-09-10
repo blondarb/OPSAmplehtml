@@ -85,6 +85,37 @@ function shapeDifferential(row: Record<string, any>): SimDifferential | null {
   return null
 }
 
+/**
+ * Read the latest persisted review artifact for a session, if any. Lets the
+ * on-demand review routes return a prior result instead of re-paying for a
+ * Bedrock call — the cheap survival Steve flagged: if a long-transcript
+ * generation crossed the gateway but its persist landed, the next click serves
+ * the stored row for free rather than regenerating (and risking the same
+ * timeout). Returns null if none, or on a missing table (42P01, migration 058
+ * not applied) — treated as "no prior result" so the caller regenerates.
+ */
+export async function readLatestEvaluation(
+  pool: Pool,
+  sessionId: string,
+  evaluator: 'physician_summary' | 'thoroughness_lean',
+): Promise<unknown | null> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT result FROM historian_evaluations
+       WHERE session_id = $1 AND evaluator = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [sessionId, evaluator],
+    )
+    if (!rows || rows.length === 0) return null
+    return coerceJson(rows[0].result)
+  } catch (err: any) {
+    if (err?.code === '42P01') return null
+    console.error('[review] readLatestEvaluation failed (treating as none):', err?.message || err)
+    return null
+  }
+}
+
 export async function loadSessionForReview(pool: Pool, sessionId: string): Promise<SessionReviewInput | null> {
   const sql = `
     SELECT hs."transcript", hs."structured_output", hs."final_differential",

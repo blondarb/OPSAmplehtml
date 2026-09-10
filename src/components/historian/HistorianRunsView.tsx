@@ -503,7 +503,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
   // On-demand "Generate review": physician summary → thoroughness (each a single
   // gateway-sized call), then refresh so the panels render. Best-effort per
   // stage so one failing doesn't lose the other.
-  const generateReview = useCallback(async () => {
+  const generateReview = useCallback(async (force: boolean) => {
     setReviewBusy(true)
     setReviewError(null)
     const errors: string[] = []
@@ -512,7 +512,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
       const res = await fetch('/api/ai/historian/review/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: run.id }),
+        body: JSON.stringify({ sessionId: run.id, force }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -526,7 +526,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
       const res = await fetch('/api/ai/historian/review/thoroughness', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: run.id }),
+        body: JSON.stringify({ sessionId: run.id, force }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -540,6 +540,10 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
     setReviewBusy(false)
     if (errors.length) setReviewError(errors.join(' · '))
   }, [run.id, refresh])
+
+  // "Generate" reuses any persisted result (cheap re-click after a landed
+  // persist); "Regenerate" forces a fresh Bedrock run.
+  const onGenerate = useCallback(() => generateReview(hasReview), [generateReview, hasReview])
 
   const output = (detail.structured_output || {}) as HistorianStructuredOutput
   const redFlags: HistorianRedFlag[] = Array.isArray(detail.red_flags) ? detail.red_flags : []
@@ -584,7 +588,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
               </p>
             </div>
             <button
-              onClick={() => void generateReview()}
+              onClick={() => void onGenerate()}
               disabled={reviewBusy || transcript.length < 2}
               className="shrink-0 rounded-lg border border-teal-600/50 bg-teal-500/10 px-3.5 py-2 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20 disabled:opacity-50"
             >

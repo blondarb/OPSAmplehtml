@@ -30,12 +30,23 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null)
     const sessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : ''
+    const force = body?.force === true
     if (!sessionId) return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
 
     const { getPool } = await import('@/lib/db')
     const pool = await getPool()
 
-    const { loadSessionForReview } = await import('@/lib/historian/review/loadSession')
+    const { loadSessionForReview, readLatestEvaluation } = await import('@/lib/historian/review/loadSession')
+
+    // Read-before-regenerate: if a prior summary already persisted (even from a
+    // generation whose response crossed the gateway), serve it for free rather
+    // than re-paying for the Bedrock call. `force` (the "Regenerate" button)
+    // bypasses this.
+    if (!force) {
+      const existing = await readLatestEvaluation(pool, sessionId, 'physician_summary')
+      if (existing) return NextResponse.json({ physician_summary: existing, cached: true })
+    }
+
     const input = await loadSessionForReview(pool, sessionId)
     if (!input) return NextResponse.json({ error: 'session not found' }, { status: 404 })
     if (input.transcript.length < 2) {
