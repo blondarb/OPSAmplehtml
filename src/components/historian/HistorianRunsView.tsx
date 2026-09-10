@@ -541,10 +541,6 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
     if (errors.length) setReviewError(errors.join(' · '))
   }, [run.id, refresh])
 
-  // "Generate" reuses any persisted result (cheap re-click after a landed
-  // persist); "Regenerate" forces a fresh Bedrock run.
-  const onGenerate = useCallback(() => generateReview(hasReview), [generateReview, hasReview])
-
   const output = (detail.structured_output || {}) as HistorianStructuredOutput
   const redFlags: HistorianRedFlag[] = Array.isArray(detail.red_flags) ? detail.red_flags : []
   const differentials = resolveDifferentials(detail)
@@ -588,7 +584,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
               </p>
             </div>
             <button
-              onClick={() => void onGenerate()}
+              onClick={() => void generateReview(hasReview)}
               disabled={reviewBusy || transcript.length < 2}
               className="shrink-0 rounded-lg border border-teal-600/50 bg-teal-500/10 px-3.5 py-2 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20 disabled:opacity-50"
             >
