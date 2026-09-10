@@ -29,7 +29,12 @@ import { computeCostUsd } from './constants'
 
 export interface PersistEvaluationInput {
   sessionId: string
-  evaluator: 'thoroughness' | 'independent_ddx' | 'agreement'
+  // 'physician_summary' + 'thoroughness_lean' are the on-demand review kinds
+  // generated for the LIVE /rnd/historian dashboard (same generators the sim
+  // uses, so the dashboard renders them with the identical panels). Stored
+  // under distinct evaluator names so they never collide with the async
+  // production 'thoroughness' rows written fire-and-forget from /save.
+  evaluator: 'thoroughness' | 'independent_ddx' | 'agreement' | 'physician_summary' | 'thoroughness_lean'
   modelId: string
   promptVersion: string
   rubricVersion?: string | null

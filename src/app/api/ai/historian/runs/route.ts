@@ -145,7 +145,43 @@ export async function GET(request: Request) {
       if (rows.length === 0) {
         return NextResponse.json({ error: 'Run not found' }, { status: 404 })
       }
-      return NextResponse.json({ run: normaliseRow(rows[0]) })
+      const run = normaliseRow(rows[0])
+
+      // Attach the on-demand review artifacts (physician summary + lean
+      // thoroughness, both keyed by session id in historian_evaluations) and
+      // the human review feedback. Each in its own try/catch: these tables may
+      // not exist yet (migrations 058/063), which must not break the run fetch.
+      try {
+        const { rows: evalRows } = await pool.query(
+          `SELECT DISTINCT ON (evaluator) evaluator, result, created_at
+           FROM historian_evaluations
+           WHERE session_id = $1 AND evaluator IN ('physician_summary', 'thoroughness_lean')
+           ORDER BY evaluator, created_at DESC`,
+          [id],
+        )
+        for (const r of evalRows) {
+          if (r.evaluator === 'physician_summary') run.physician_summary = coerceJson(r.result)
+          if (r.evaluator === 'thoroughness_lean') run.thoroughness = coerceJson(r.result)
+        }
+      } catch (err: any) {
+        if (err?.code !== '42P01') console.error('[runs] evaluations join failed (non-fatal):', err?.message || err)
+      }
+
+      try {
+        const { rows: fbRows } = await pool.query(
+          `SELECT section, verdict, notes, reviewer, updated_at
+           FROM historian_review_feedback
+           WHERE session_id = $1
+           ORDER BY updated_at DESC`,
+          [id],
+        )
+        run.review_feedback = fbRows
+      } catch (err: any) {
+        run.review_feedback = []
+        if (err?.code !== '42P01') console.error('[runs] feedback join failed (non-fatal):', err?.message || err)
+      }
+
+      return NextResponse.json({ run })
     }
 
     const conditions: string[] = []

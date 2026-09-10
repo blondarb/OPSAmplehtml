@@ -93,6 +93,11 @@ describe('runs route — historian_localizer_results join fallback', () => {
     queryMock
       .mockRejectedValueOnce(undefinedTableError())
       .mockResolvedValueOnce({ rows: [SAMPLE_ROW] })
+      // The ?id= path additionally attaches the on-demand review artifacts:
+      // one query for historian_evaluations (physician_summary +
+      // thoroughness_lean) and one for historian_review_feedback. Both are
+      // best-effort — return empty here.
+      .mockResolvedValue({ rows: [] })
 
     const res = await GET(req('http://historian.test/api/ai/historian/runs?id=session-1'))
     expect(res.status).toBe(200)
@@ -100,7 +105,8 @@ describe('runs route — historian_localizer_results join fallback', () => {
 
     expect(body.run.id).toBe('session-1')
     expect(body.run.localizer_differential).toEqual([{ diagnosis: 'Synthetic diagnosis' }])
-    expect(queryMock).toHaveBeenCalledTimes(2)
+    // 4 = localizer(with hlr → 42P01) + localizer(fallback) + evaluations + feedback.
+    expect(queryMock).toHaveBeenCalledTimes(4)
     expect(queryMock.mock.calls[1][1]).toEqual(['session-1'])
   })
 
