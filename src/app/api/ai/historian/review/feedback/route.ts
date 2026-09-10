@@ -7,7 +7,7 @@
  * GET  — return all feedback rows for ?sessionId=<id> (every reviewer).
  *
  * Cognito-gated; reviewer identity comes from the id token, never the body.
- * Stored in historian_review_feedback (migration 063). Until that migration is
+ * Stored in historian_review_feedback (migration 065). Until that migration is
  * applied the table is absent (42P01) — treated as benign: GET returns [] and
  * POST reports storage-not-ready so the UI can degrade instead of hard-erroring.
  */
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   } catch (err: any) {
     if (err?.code === '42P01') {
       return NextResponse.json(
-        { error: 'feedback storage not ready (migration 063 not applied)' },
+        { error: 'feedback storage not ready (migration 065 not applied)' },
         { status: 503 },
       )
     }

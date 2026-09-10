@@ -1,4 +1,4 @@
--- Migration 063: historian_review_feedback
+-- Migration 065: historian_review_feedback
 --
 -- Human-in-the-loop review of AI Historian output. A physician/reviewer marks
 -- agree/disagree + optional notes on each section of a completed interview's
@@ -19,8 +19,8 @@
 --
 -- Additive only — no backfill, no default beyond created_at.
 --
--- Run: psql $RDS_URL -f migrations/063_historian_review_feedback.sql
--- Rollback: migrations/063_historian_review_feedback.down.sql
+-- Run: psql $RDS_URL -f migrations/065_historian_review_feedback.sql
+-- Rollback: migrations/065_historian_review_feedback.down.sql
 --
 -- NOT applied here — additive only, applied by a later rollout task.
 

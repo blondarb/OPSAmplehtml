@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       // Attach the on-demand review artifacts (physician summary + lean
       // thoroughness, both keyed by session id in historian_evaluations) and
       // the human review feedback. Each in its own try/catch: these tables may
-      // not exist yet (migrations 058/063), which must not break the run fetch.
+      // not exist yet (migrations 058/065), which must not break the run fetch.
       try {
         const { rows: evalRows } = await pool.query(
           `SELECT DISTINCT ON (evaluator) evaluator, result, created_at
