@@ -162,44 +162,76 @@ export default function HistorianSimView() {
         await new Promise((r) => setTimeout(r, 350))
       }
 
-      // Scoring in stages so no single request exceeds the ~30s gateway limit.
+      // Scoring: durable 202+poll (async job) so the heavy Bedrock work runs
+      // AFTER the response and never has to fit the ~30s gateway. Falls back to
+      // the legacy staged path if the job table isn't applied yet (501).
       setLiveStatus('scoring')
-      const diff = await postJson(
-        '/api/ai/historian/sim/score/differential',
-        { persona: livePersona, transcript: convo },
-        'Differential',
-      )
-      const sum = await postJson(
-        '/api/ai/historian/sim/score/summary',
-        { persona: livePersona, transcript: convo, differential: diff.differential },
-        'Summary',
-      )
-      // Thoroughness is best-effort: even the lean judge shouldn't be allowed
-      // to lose the whole run if it hiccups. Failure → run still scores.
-      let thoroughness: unknown = null
-      try {
-        const thor = await postJson(
-          '/api/ai/historian/sim/score/thoroughness',
-          { persona: livePersona, transcript: convo },
-          'Thoroughness',
-        )
-        thoroughness = thor.thoroughness ?? null
-      } catch {
-        // optional — continue without thoroughness
+      let scoredAsync = false
+      const startRes = await fetch('/api/ai/historian/sim/score/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona: livePersona, transcript: convo, batchId, batchLabel }),
+      })
+      if (startRes.status !== 501) {
+        if (!startRes.ok) {
+          const b = await startRes.json().catch(() => ({}))
+          throw new Error(`Scoring failed to start (${startRes.status})${b.error ? `: ${b.error}` : ''}`)
+        }
+        const { jobId } = await startRes.json()
+        const deadline = Date.now() + 5 * 60 * 1000
+        let polling = true
+        while (polling && Date.now() <= deadline) {
+          await new Promise((r) => setTimeout(r, 2000))
+          const sres = await fetch(`/api/ai/historian/sim/score/status?jobId=${encodeURIComponent(jobId)}`)
+          if (sres.status === 501) { polling = false; break } // table missing → fall back
+          if (!sres.ok) continue // transient — keep polling
+          const j = await sres.json()
+          if (j.status === 'complete') { scoredAsync = true; polling = false }
+          else if (j.status === 'error') throw new Error(j.error || 'Scoring failed')
+          else if (j.status === 'not_enabled') { polling = false }
+          // else 'pending' → keep polling
+        }
+        if (polling) throw new Error('Scoring timed out — please try again.')
       }
-      await postJson(
-        '/api/ai/historian/sim/score/finalize',
-        {
-          persona: livePersona,
-          transcript: convo,
-          differential: diff.differential,
-          physician_summary: sum.physician_summary,
-          thoroughness,
-          batchId,
-          batchLabel,
-        },
-        'Scoring',
-      )
+
+      if (!scoredAsync) {
+        // Legacy staged fallback (pre-066): each request kept under the gateway.
+        const diff = await postJson(
+          '/api/ai/historian/sim/score/differential',
+          { persona: livePersona, transcript: convo },
+          'Differential',
+        )
+        const sum = await postJson(
+          '/api/ai/historian/sim/score/summary',
+          { persona: livePersona, transcript: convo, differential: diff.differential },
+          'Summary',
+        )
+        let thoroughness: unknown = null
+        try {
+          const thor = await postJson(
+            '/api/ai/historian/sim/score/thoroughness',
+            { persona: livePersona, transcript: convo },
+            'Thoroughness',
+          )
+          thoroughness = thor.thoroughness ?? null
+        } catch {
+          // optional — continue without thoroughness
+        }
+        await postJson(
+          '/api/ai/historian/sim/score/finalize',
+          {
+            persona: livePersona,
+            transcript: convo,
+            differential: diff.differential,
+            physician_summary: sum.physician_summary,
+            thoroughness,
+            batchId,
+            batchLabel,
+          },
+          'Scoring',
+        )
+      }
+
       setLiveStatus('done')
       await load()
     } catch (err: any) {
