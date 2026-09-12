@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { INVESTIGATIONAL_BANNER } from '@/lib/historian/eval/constants'
+import { PhysicianSummaryPanel, ThoroughnessPanel, SectionFeedback } from './reviewPanels'
 import type {
   HistorianSession,
   HistorianStructuredOutput,
@@ -47,6 +48,10 @@ interface RunRow extends Omit<HistorianSession, 'final_differential'> {
   localizer_kb_sources?: string[]
   localizer_last_run_at?: string | null
   localizer_run_count?: number | null
+  // On-demand review artifacts (attached by /api/ai/historian/runs?id=).
+  physician_summary?: Record<string, any> | null
+  thoroughness?: Record<string, any> | null
+  review_feedback?: Array<{ section: string; verdict: string; notes?: string | null; reviewer?: string; updated_at?: string }>
 }
 
 interface ResolvedDifferential {
@@ -472,12 +477,78 @@ function FieldList({
 }
 
 export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void }) {
-  const output = (run.structured_output || {}) as HistorianStructuredOutput
-  const redFlags: HistorianRedFlag[] = Array.isArray(run.red_flags) ? run.red_flags : []
-  const differentials = resolveDifferentials(run)
-  const transcript: HistorianTranscriptEntry[] = Array.isArray(run.transcript) ? run.transcript : []
-  const kbSources: string[] = Array.isArray(run.localizer_kb_sources) ? run.localizer_kb_sources : []
-  const followUps: string[] = Array.isArray(run.localizer_questions) ? run.localizer_questions : []
+  // Start with the list row, then fetch full detail by id — that's where the
+  // on-demand review artifacts (physician summary, thoroughness, human
+  // feedback) are attached (see /api/ai/historian/runs?id=).
+  const [detail, setDetail] = useState<RunRow>(run)
+  const [reviewBusy, setReviewBusy] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [reviewStage, setReviewStage] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai/historian/runs?id=${encodeURIComponent(run.id)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.run) setDetail(data.run)
+    } catch {
+      // keep the current detail on a transient fetch error
+    }
+  }, [run.id])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  // On-demand "Generate review": physician summary → thoroughness (each a single
+  // gateway-sized call), then refresh so the panels render. Best-effort per
+  // stage so one failing doesn't lose the other.
+  const generateReview = useCallback(async (force: boolean) => {
+    setReviewBusy(true)
+    setReviewError(null)
+    const errors: string[] = []
+    setReviewStage('Writing physician summary…')
+    try {
+      const res = await fetch('/api/ai/historian/review/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: run.id, force }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        errors.push(`Summary: ${d.error || res.status}`)
+      }
+    } catch (err: any) {
+      errors.push(`Summary: ${err?.message || 'failed'}`)
+    }
+    setReviewStage('Scoring thoroughness…')
+    try {
+      const res = await fetch('/api/ai/historian/review/thoroughness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: run.id, force }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        errors.push(`Thoroughness: ${d.error || res.status}`)
+      }
+    } catch (err: any) {
+      errors.push(`Thoroughness: ${err?.message || 'failed'}`)
+    }
+    await refresh()
+    setReviewStage(null)
+    setReviewBusy(false)
+    if (errors.length) setReviewError(errors.join(' · '))
+  }, [run.id, refresh])
+
+  const output = (detail.structured_output || {}) as HistorianStructuredOutput
+  const redFlags: HistorianRedFlag[] = Array.isArray(detail.red_flags) ? detail.red_flags : []
+  const differentials = resolveDifferentials(detail)
+  const transcript: HistorianTranscriptEntry[] = Array.isArray(detail.transcript) ? detail.transcript : []
+  const kbSources: string[] = Array.isArray(detail.localizer_kb_sources) ? detail.localizer_kb_sources : []
+  const followUps: string[] = Array.isArray(detail.localizer_questions) ? detail.localizer_questions : []
+  const feedback = Array.isArray(detail.review_feedback) ? detail.review_feedback : []
+  const hasReview = !!detail.physician_summary || !!detail.thoroughness
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
@@ -487,13 +558,13 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
       >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-white">{patientLabel(run)}</h2>
+            <h2 className="text-lg font-bold text-white">{patientLabel(detail)}</h2>
             <p className="text-xs text-slate-400">
-              {fmtDate(run.created_at)} · {run.session_type?.replace(/_/g, ' ')} · {run.question_count ?? 0} questions ·{' '}
-              {fmtDuration(run.duration_seconds)}
+              {fmtDate(detail.created_at)} · {detail.session_type?.replace(/_/g, ' ')} · {detail.question_count ?? 0} questions ·{' '}
+              {fmtDuration(detail.duration_seconds)}
             </p>
             <div className="mt-2">
-              <CompletionBadge status={run.interview_completion_status} />
+              <CompletionBadge status={detail.interview_completion_status} />
             </div>
           </div>
           <button
@@ -503,6 +574,42 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
             Close
           </button>
         </div>
+
+        <div className="mb-5 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-white">AI Review</h3>
+              <p className="mt-0.5 text-xs text-slate-400">
+                In-depth physician summary + thoroughness score for this interview — same review the simulator runs.
+              </p>
+            </div>
+            <button
+              onClick={() => void generateReview(hasReview)}
+              disabled={reviewBusy || transcript.length < 2}
+              className="shrink-0 rounded-lg border border-teal-600/50 bg-teal-500/10 px-3.5 py-2 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20 disabled:opacity-50"
+            >
+              {reviewBusy ? reviewStage || 'Generating…' : hasReview ? 'Regenerate review' : 'Generate review'}
+            </button>
+          </div>
+          {reviewError && <p className="mt-2 text-xs text-rose-300">{reviewError}</p>}
+          {transcript.length < 2 && (
+            <p className="mt-2 text-xs text-slate-500">Transcript too short to review.</p>
+          )}
+        </div>
+
+        {detail.physician_summary && (
+          <Section title="Physician Summary">
+            <PhysicianSummaryPanel summary={detail.physician_summary} />
+            <SectionFeedback sessionId={run.id} section="physician_summary" existing={feedback} onSaved={() => void refresh()} />
+          </Section>
+        )}
+
+        {detail.thoroughness && (
+          <Section title="Thoroughness">
+            <ThoroughnessPanel thoroughness={detail.thoroughness} />
+            <SectionFeedback sessionId={run.id} section="thoroughness" existing={feedback} onSaved={() => void refresh()} />
+          </Section>
+        )}
 
         {redFlags.length > 0 && (
           <Section title="Red Flags">
@@ -594,9 +701,9 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
                 <p className="mt-2 text-xs text-slate-500">{INVESTIGATIONAL_BANNER}</p>
               </>
             )}
-            {source === 'localizer' && run.localizer_hypothesis && (
+            {source === 'localizer' && detail.localizer_hypothesis && (
               <p className="mt-2 text-sm text-slate-400">
-                <span className="font-semibold text-slate-300">Localization:</span> {run.localizer_hypothesis}
+                <span className="font-semibold text-slate-300">Localization:</span> {detail.localizer_hypothesis}
               </p>
             )}
             {source === 'localizer' && followUps.length > 0 && (
@@ -613,9 +720,15 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </Section>
         ))}
 
-        {run.narrative_summary && (
+        {differentials.length > 0 && (
+          <div className="mb-5">
+            <SectionFeedback sessionId={run.id} section="differential" existing={feedback} onSaved={() => void refresh()} />
+          </div>
+        )}
+
+        {detail.narrative_summary && (
           <Section title="Narrative Summary">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{run.narrative_summary}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{detail.narrative_summary}</p>
           </Section>
         )}
 
