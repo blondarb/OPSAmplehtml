@@ -52,7 +52,9 @@ function makeRun(overrides: Partial<RunRow> = {}): RunRow {
   }
 }
 
-const render = (run: RunRow) => renderToStaticMarkup(<RunDetailDrawer run={run} onClose={() => {}} />)
+// The differential now lives on its own tab; render that tab so these
+// differential-focused assertions see its markup (renderToStaticMarkup can't click).
+const render = (run: RunRow) => renderToStaticMarkup(<RunDetailDrawer run={run} onClose={() => {}} initialTab="differential" />)
 
 describe('runs view differential', () => {
   it('renders the final differential, mapped likelihoods, summary and investigational label', () => {
