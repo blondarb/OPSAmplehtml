@@ -476,7 +476,9 @@ function FieldList({
   )
 }
 
-export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void }) {
+type DrawerTab = 'summary' | 'differential' | 'thoroughness' | 'history' | 'background' | 'transcript'
+
+export function RunDetailDrawer({ run, onClose, initialTab }: { run: RunRow; onClose: () => void; initialTab?: DrawerTab }) {
   // Start with the list row, then fetch full detail by id — that's where the
   // on-demand review artifacts (physician summary, thoroughness, human
   // feedback) are attached (see /api/ai/historian/runs?id=).
@@ -549,6 +551,12 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
   const followUps: string[] = Array.isArray(detail.localizer_questions) ? detail.localizer_questions : []
   const feedback = Array.isArray(detail.review_feedback) ? detail.review_feedback : []
   const hasReview = !!detail.physician_summary || !!detail.thoroughness
+  const hasFollowUp = FOLLOWUP_FIELDS.some(([k]) => {
+    const v = output[k]
+    return typeof v === 'string' && v.trim().length > 0
+  })
+
+  const [tab, setTab] = useState<DrawerTab>(initialTab ?? 'summary')
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
@@ -575,6 +583,28 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </button>
         </div>
 
+        <div className="mb-5 flex flex-wrap gap-1 border-b border-slate-800">
+          {([
+            ['summary', 'Summary'],
+            ['differential', 'Differential'],
+            ['thoroughness', 'Thoroughness'],
+            ['history', 'History'],
+            ['background', 'Meds & Background'],
+            ['transcript', 'Transcript'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+                tab === key ? 'border-teal-500 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'summary' && (
         <div className="mb-5 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -596,22 +626,31 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
             <p className="mt-2 text-xs text-slate-500">Transcript too short to review.</p>
           )}
         </div>
+        )}
 
-        {detail.physician_summary && (
+        {tab === 'summary' && detail.physician_summary && (
           <Section title="Physician Summary">
             <PhysicianSummaryPanel summary={detail.physician_summary} />
             <SectionFeedback sessionId={run.id} section="physician_summary" existing={feedback} onSaved={() => void refresh()} />
           </Section>
         )}
 
-        {detail.thoroughness && (
+        {tab === 'summary' && !detail.physician_summary && transcript.length >= 2 && (
+          <p className="text-sm text-slate-500">No physician summary yet — click &ldquo;Generate review&rdquo; above.</p>
+        )}
+
+        {tab === 'thoroughness' && detail.thoroughness && (
           <Section title="Thoroughness">
             <ThoroughnessPanel thoroughness={detail.thoroughness} />
             <SectionFeedback sessionId={run.id} section="thoroughness" existing={feedback} onSaved={() => void refresh()} />
           </Section>
         )}
 
-        {redFlags.length > 0 && (
+        {tab === 'thoroughness' && !detail.thoroughness && (
+          <p className="text-sm text-slate-500">No thoroughness score yet — click &ldquo;Generate review&rdquo; on the Summary tab.</p>
+        )}
+
+        {tab === 'summary' && redFlags.length > 0 && (
           <Section title="Red Flags">
             <div className="space-y-1.5">
               {redFlags.map((f, i) => (
@@ -625,13 +664,17 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </Section>
         )}
 
-        {resolveEvaluationStatus(run) && (
+        {tab === 'differential' && resolveEvaluationStatus(run) && (
           <div role="status" className="rounded-lg border border-slate-700 p-3 text-sm text-slate-300">
             {resolveEvaluationStatus(run)}
           </div>
         )}
 
-        {differentials.map(({ entries: ddx, source, label, summary, excluded, unassessed, dropped_exclusions, exclusion_audit_flags }) => (
+        {tab === 'differential' && differentials.length === 0 && (
+          <p className="text-sm text-slate-500">No differential recorded for this interview.</p>
+        )}
+
+        {tab === 'differential' && differentials.map(({ entries: ddx, source, label, summary, excluded, unassessed, dropped_exclusions, exclusion_audit_flags }) => (
           <Section key={source} title={
             <>
               Differential Diagnosis &amp; Reasoning
@@ -720,36 +763,37 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </Section>
         ))}
 
-        {differentials.length > 0 && (
+        {tab === 'differential' && differentials.length > 0 && (
           <div className="mb-5">
             <SectionFeedback sessionId={run.id} section="differential" existing={feedback} onSaved={() => void refresh()} />
           </div>
         )}
 
-        {detail.narrative_summary && (
+        {tab === 'summary' && detail.narrative_summary && (
           <Section title="Narrative Summary">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{detail.narrative_summary}</p>
           </Section>
         )}
 
-        <Section title="History of Present Illness">
-          <FieldList output={output} fields={HPI_FIELDS} />
-        </Section>
+        {tab === 'history' && (
+          <Section title="History of Present Illness">
+            <FieldList output={output} fields={HPI_FIELDS} />
+          </Section>
+        )}
 
-        <Section title="Medications & Background">
-          <FieldList output={output} fields={HISTORY_FIELDS} />
-        </Section>
+        {tab === 'background' && (
+          <Section title="Medications & Background">
+            <FieldList output={output} fields={HISTORY_FIELDS} />
+          </Section>
+        )}
 
-        {FOLLOWUP_FIELDS.some(([k]) => {
-          const v = output[k]
-          return typeof v === 'string' && v.trim().length > 0
-        }) && (
+        {tab === 'background' && hasFollowUp && (
           <Section title="Follow-Up Details">
             <FieldList output={output} fields={FOLLOWUP_FIELDS} />
           </Section>
         )}
 
-        {transcript.length > 0 && (
+        {tab === 'transcript' && transcript.length > 0 && (
           <Section title={`Transcript (${transcript.length} turns)`}>
             <div className="space-y-2">
               {transcript.map((t, i) => (
